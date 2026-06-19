@@ -86,6 +86,7 @@ async def list_rooms():
         result.append({
             "room_code": code,
             "host_name": room.state.players[0].name,
+            "host_player_id": room.host_player_id,
             "players": connected,
             "max_players": max_players,
             "in_game": in_game,
@@ -130,6 +131,7 @@ async def websocket_endpoint(ws: WebSocket, room_code: str, player_id: str):
                 room.state.players[0].name = message.get("player_name", "玩家1")
                 room.state.players[0].ws = ws
                 room.state.players[0].connected = True
+                room.host_player_id = message.get("player_id", "")  # 记录房主ID
 
                 await ws.send_text(json.dumps({
                     "type": "room_created",
@@ -163,6 +165,14 @@ async def websocket_endpoint(ws: WebSocket, room_code: str, player_id: str):
                 if room.state.players[1].connected:
                     await ws.send_text(json.dumps({
                         "type": "error", "message": "房间已满"
+                    }, ensure_ascii=False))
+                    continue
+
+                # 禁止加入自己的房间
+                joiner_id = message.get("player_id", "")
+                if joiner_id and room.host_player_id and joiner_id == room.host_player_id:
+                    await ws.send_text(json.dumps({
+                        "type": "error", "message": "不能加入自己创建的房间！请换一个浏览器或无痕模式"
                     }, ensure_ascii=False))
                     continue
 

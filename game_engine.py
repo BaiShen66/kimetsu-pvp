@@ -592,6 +592,7 @@ class GameRoom:
         self.created_at = time.time()
         self.last_activity = time.time()
         self.empty_since: float = None  # 房间变空的时间（所有玩家离开时记录）
+        self.host_player_id: str = ""   # 房主的玩家ID
 
     def is_expired(self) -> bool:
         """检查房间是否过期（15分钟无活动，或空房间超过10分钟）"""

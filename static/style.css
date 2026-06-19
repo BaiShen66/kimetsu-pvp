@@ -413,6 +413,20 @@ input[type="text"]:focus {
     border-style: dashed;
 }
 
+/* 自己的房间 */
+.room-item.status-mine {
+    border-color: rgba(0, 212, 255, 0.3);
+    background: rgba(0, 212, 255, 0.03);
+}
+
+.room-own-tag {
+    font-size: 10px;
+    color: var(--self-blue);
+    background: rgba(0, 212, 255, 0.1);
+    padding: 1px 6px;
+    border-radius: 4px;
+}
+
 /* 对战中 - 灰色 */
 .room-item.status-ingame {
     border-color: var(--border-color);
@@ -483,6 +497,12 @@ input[type="text"]:focus {
 .room-count-badge.empty {
     background: rgba(255, 68, 68, 0.08);
     color: #cc6666;
+}
+
+/* 自己的房间 */
+.room-count-badge.mine {
+    background: rgba(0, 212, 255, 0.12);
+    color: var(--self-blue);
 }
 
 .room-empty-tip {
