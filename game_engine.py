@@ -58,10 +58,9 @@ class GameState:
         self.game_over: bool = False
         self.winner: Optional[int] = None
         self.pending_rps: bool = False  # 是否等待猜拳
-        self.rps_human_pid: int = 0     # 人方（攻击方）
+        self.rps_player_id: int = 0     # 需要猜拳的玩家
         self.rps_skill_name: str = ""   # 触发猜拳的技能名
-        self.rps_human_choice: str = ""  # 人方猜拳选择
-        self.rps_demon_choice: str = ""  # 鬼方猜拳选择
+        self._rps_damage_pending: float = 0  # 猜拳中暂存的伤害值
         self.battle_history: List[dict] = []  # 完整战斗记录
 
     def generate_map(self):
@@ -247,11 +246,7 @@ class GameState:
 
         action_type = action.get("action")
 
-        if action_type == "stay":
-            # 原地不动
-            result["moved_to"] = None
-
-        elif action_type == "move":
+        if action_type == "move":
             # 纯移动
             direction = action.get("direction")
             if direction and direction in DIRECTIONS:
@@ -414,13 +409,12 @@ class GameState:
             skill_damage = r.get("skill_damage", 1.0)
 
             if p.character and p.character.faction == "human":
-                # 人方攻击鬼方 → 触发猜拳（砍头判定）
+                # 人方攻击鬼方 → 触发猜拳
                 self.pending_rps = True
-                self.rps_human_pid = pid
+                self.rps_player_id = pid
                 self.rps_skill_name = skill_name
-                self.rps_human_choice = ""
-                self.rps_demon_choice = ""
-                turn_log.append(f"⚔️ {p.name} 的 {skill_name} 命中脖颈！猜拳判定砍头...")
+                self._rps_damage_pending = skill_damage  # 暂存伤害值
+                turn_log.append(f"⚔️ {p.name} 的 {skill_name} 命中！等待猜拳判定...")
             else:
                 # 鬼方攻击人方 → 直接造成伤害
                 actual_damage = self._calculate_demon_damage(skill_damage)
@@ -494,31 +488,24 @@ class GameState:
             "game_over": self.game_over,
             "winner": self.winner,
             "pending_rps": self.pending_rps,
+            "rps_player_id": self.rps_player_id if self.pending_rps else None,
             "rps_skill_name": self.rps_skill_name if self.pending_rps else None,
         }
 
-    def submit_rps_choice(self, player_id: int, choice: str) -> dict:
-        """提交猜拳选择，返回当前状态（不立即结算，等双方都选完）"""
-        if not self.pending_rps:
+    def resolve_rps(self, player_id: int, choice: str) -> Dict:
+        """
+        结算猜拳
+        choice: "rock", "scissors", "paper"
+        """
+        if not self.pending_rps or player_id != self.rps_player_id:
             return {"error": "当前没有待处理的猜拳"}
-        if choice not in ("rock", "scissors", "paper"):
-            return {"error": "无效选择"}
 
-        if player_id == self.rps_human_pid:
-            self.rps_human_choice = choice
-        else:
-            self.rps_demon_choice = choice
+        # 鬼方随机防御
+        demon_choice = random.choice(["rock", "scissors", "paper"])
+        human_choice = choice
 
-        if self.rps_human_choice and self.rps_demon_choice:
-            return self._resolve_rps()
-        return {"waiting": True}
-
-    def _resolve_rps(self) -> dict:
-        """双方都选了，结算猜拳"""
-        human_choice = self.rps_human_choice
-        demon_choice = self.rps_demon_choice
-        human_pid = self.rps_human_pid
-        demon_pid = 1 - human_pid
+        # 判定胜负
+        # 石头赢剪刀，剪刀赢布，布赢石头
         win_map = {"rock": "scissors", "scissors": "paper", "paper": "rock"}
 
         if win_map[human_choice] == demon_choice:
@@ -528,35 +515,47 @@ class GameState:
         else:
             result = "lose"
 
-        if result == "win":
-            # 砍头秒杀！
-            self.players[demon_pid].hp = 0
-            self.game_over = True
-            self.winner = human_pid
+        damage = self._rps_damage_pending if result == "win" else 0
+        demon_pid = 1 - player_id
+
+        if damage > 0:
+            self.players[demon_pid].hp -= damage
             self.log.append(
-                f"⚔️ {self.players[human_pid].name} 猜拳 {human_choice} vs {demon_choice} —— 砍头成功！{self.players[demon_pid].name} 被斩杀！"
+                f"✊ {self.players[player_id].name} 猜拳 {human_choice} vs {demon_choice} —— 胜利！造成 {damage} 点伤害！"
             )
-            self.log.append(f"🏆 {self.players[human_pid].name} 获胜！")
         elif result == "draw":
-            # 平局 = 没砍下头
-            self.pending_rps = False
+            # 平局：不清除 pending_rps，再来一次
             self.log.append(
-                f"✊ {self.players[human_pid].name} {human_choice} vs {self.players[demon_pid].name} {demon_choice} —— 平局！没砍下头！"
+                f"✊ {self.players[player_id].name} 猜拳 {human_choice} vs {demon_choice} —— 平局！再来一次！"
             )
+            return {
+                "result": "draw",
+                "human_choice": human_choice,
+                "demon_choice": demon_choice,
+                "damage": 0,
+                "game_over": False,
+                "retry": True,
+            }
         else:
-            # 鬼防住
-            self.pending_rps = False
             self.log.append(
-                f"🛡️ {self.players[human_pid].name} {human_choice} vs {self.players[demon_pid].name} {demon_choice} —— 鬼防住了！"
+                f"✊ {self.players[player_id].name} 猜拳 {human_choice} vs {demon_choice} —— 失败，无伤害！"
             )
 
-        if self.game_over:
-            self.pending_rps = False
+        # 检查鬼方是否死亡
+        if self.players[demon_pid].hp <= 0:
+            self.game_over = True
+            self.winner = player_id
+            self.log.append(f"💀 {self.players[demon_pid].name} 被击败！")
+            self.log.append(f"🏆 {self.players[player_id].name} 获胜！")
+
+        self.pending_rps = False
+        self.rps_player_id = 0
 
         return {
             "result": result,
             "human_choice": human_choice,
             "demon_choice": demon_choice,
+            "damage": damage,
             "game_over": self.game_over,
             "winner": self.winner,
         }
@@ -689,16 +688,13 @@ class GameRoom:
             p = self.state.players[player_id]
 
             if p.stunned:
-                self.turn_actions[player_id] = {"action": "stay"}
+                # 晕眩中，自动跳过
+                self.turn_actions[player_id] = {"action": "pass"}
                 return {"type": "action_confirmed", "message": "你处于晕眩状态，本回合跳过"}
 
             action_type = data.get("action")
-            if action_type not in ("move", "skill", "stay"):
+            if action_type not in ("move", "skill"):
                 return {"type": "error", "message": "无效的行动类型"}
-
-            if action_type == "stay":
-                self.turn_actions[player_id] = {"action": "stay"}
-                return {"type": "action_confirmed", "message": "原地待命"}
 
             if action_type == "move":
                 direction = data.get("direction")
@@ -730,11 +726,11 @@ class GameRoom:
             return {"type": "action_confirmed", "message": "行动已确认，等待对手..."}
 
         elif msg_type == "rps_choice":
-            # 猜拳选择（双方都要选，选完自动结算）
+            # 猜拳选择
             choice = data.get("choice")
             if choice not in ("rock", "scissors", "paper"):
                 return {"type": "error", "message": "无效的猜拳选择"}
-            return self.state.submit_rps_choice(player_id, choice)
+            return self.state.resolve_rps(player_id, choice)
 
         return {"type": "error", "message": f"未知消息类型: {msg_type}"}
 
