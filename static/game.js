@@ -184,12 +184,15 @@ function handleMessage(msg) {
                 if (msg.for_player === 0 && msg.turn_log) {
                     msg.turn_log.forEach(log => addLog(log));
                 }
-                // 双方都收到后，用当前操控方的视角更新
+                // 双方都收到后，强制从人方视角开始新回合
                 if (state.bothStates[0] && state.bothStates[1]) {
-                    updateFullState(state.bothStates[state.controllingPlayer]);
+                    state.controllingPlayer = 0;
+                    updateFullState(state.bothStates[0]);
                     state.actionConfirmed = false;
                     state.offlineActions = {};
                     resetActionUI();
+                    const name = state.yourCharacter?.name || '炭治郎';
+                    $('controlling-label').textContent = '当前操控: ' + name;
                 }
             } else {
                 updateFullState(msg);
