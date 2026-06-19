@@ -162,6 +162,17 @@ function handleMessage(msg) {
                 state.bothStates = state.bothStates || {};
                 state.bothStates[msg.for_player] = msg;
                 updateFullState(msg);
+                // 双方状态都收到后，开始操控玩家0（人方）
+                if (state.bothStates[0] && state.bothStates[1] && state.controllingPlayer === 0 && !state._initialized) {
+                    state._initialized = true;
+                    state.controllingPlayer = 0;
+                    updateFullState(state.bothStates[0]);
+                    $$('.btn-action').forEach(b => b.disabled = false);
+                    updateSkillButtons();
+                    renderMap();
+                    updateConfirmButton();
+                    console.log('离线模式初始化完成');
+                }
             } else {
                 updateFullState(msg);
             }
@@ -1014,9 +1025,7 @@ function switchControllingPlayer() {
         updateFullState(state.bothStates[newPid]);
     }
 
-    const name = newPid === 0
-        ? (state.yourCharacter?.name || (state.bothStates?.[0]?.your_character?.name || '炭治郎'))
-        : (state.enemyCharacter?.name || (state.bothStates?.[1]?.your_character?.name || '猗窝座'));
+    const name = state.yourCharacter?.name || (state.bothStates?.[newPid]?.your_character?.name || (newPid === 0 ? '炭治郎' : '猗窝座'));
     $('controlling-label').textContent = `当前操控: ${name}`;
     $('controlling-panel').classList.remove('hidden');
 
@@ -1049,7 +1058,7 @@ if (window.Player) {
 
 if (IS_OFFLINE) {
     $('controlling-panel').classList.remove('hidden');
-    switchControllingPlayer();
+    // 不在这里切换，等 game_state 回来在 handleMessage 中处理
 }
 
 // ========== 战斗记录保存 ==========
