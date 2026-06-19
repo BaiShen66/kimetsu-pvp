@@ -72,23 +72,6 @@ async def game_page():
     return render_template("game.html")
 
 
-def _swap_players(room, pid_a, pid_b):
-    """交换两个玩家的数据（角色、名字、ws等）"""
-    if pid_a == pid_b:
-        return
-    p = room.state.players
-    # 交换名字
-    p[pid_a].name, p[pid_b].name = p[pid_b].name, p[pid_a].name
-    # 交换ws
-    p[pid_a].ws, p[pid_b].ws = p[pid_b].ws, p[pid_a].ws
-    # 交换角色
-    p[pid_a].character, p[pid_b].character = p[pid_b].character, p[pid_a].character
-    p[pid_a].max_hp, p[pid_b].max_hp = p[pid_b].max_hp, p[pid_a].max_hp
-    p[pid_a].position, p[pid_b].position = p[pid_b].position, p[pid_a].position
-    # 交换连接状态
-    p[pid_a].connected, p[pid_b].connected = p[pid_b].connected, p[pid_a].connected
-
-
 async def _process_and_broadcast_turn(room):
     """处理回合并广播结果"""
     turn_result = room.process_turn()
@@ -399,7 +382,7 @@ async def websocket_endpoint(ws: WebSocket, room_code: str, player_id: str):
                     await ws.send_text(json.dumps({"type": "side_rps_waiting"}, ensure_ascii=False))
 
             elif msg_type == "side_select":
-                # 胜者选择阵营
+                # 胜者选择阵营 - 交换角色对象（不交换玩家ws）
                 if room is None or room.side_rps_winner is None:
                     await ws.send_text(json.dumps({"type": "error", "message": "无权选边"}, ensure_ascii=False))
                     continue
@@ -407,21 +390,27 @@ async def websocket_endpoint(ws: WebSocket, room_code: str, player_id: str):
                     await ws.send_text(json.dumps({"type": "error", "message": "不是猜拳胜者"}, ensure_ascii=False))
                     continue
 
-                pick = message.get("pick", "human")  # "human" or "demon"
+                pick = message.get("pick", "human")
                 if pick not in ("human", "demon"):
                     continue
 
                 winner_pid = room.side_rps_winner
                 loser_pid = 1 - winner_pid
 
-                if pick == "human":
-                    # 胜者选人方(pid=0)，需要交换角色
-                    if winner_pid != 0:
-                        _swap_players(room, winner_pid, 0)
-                else:
-                    # 胜者选鬼方(pid=1)，需要交换角色
-                    if winner_pid != 1:
-                        _swap_players(room, winner_pid, 1)
+                # 人方=pid0的角色，鬼方=pid1的角色
+                # 如果胜者选的和当前分配的相反，交换两个slot的角色对象
+                if (pick == "human" and winner_pid != 0) or (pick == "demon" and winner_pid != 1):
+                    p0 = room.state.players[0]
+                    p1 = room.state.players[1]
+                    # 交换角色
+                    p0.character, p1.character = p1.character, p0.character
+                    p0.max_hp, p1.max_hp = p1.max_hp, p0.max_hp
+                    p0.position, p1.position = p1.position, p0.position
+                    # 交换名字
+                    p0.name, p1.name = p1.name, p0.name
+                    # 交换ws（让ws跟随角色，这样pid=0的ws始终操控人方）
+                    p0.ws, p1.ws = p1.ws, p0.ws
+                    print(f"[选边] {p0.name}(pid0)={p0.character.name} | {p1.name}(pid1)={p1.character.name}")
 
                 room.side_selected = True
 
@@ -432,7 +421,7 @@ async def websocket_endpoint(ws: WebSocket, room_code: str, player_id: str):
                         try:
                             await p.ws.send_text(json.dumps({
                                 "type": "side_confirmed",
-                                "your_side": "human" if pidx == 0 else "demon",
+                                "your_side": p.character.faction,
                                 "your_character": {
                                     "name": p.character.name,
                                     "faction": p.character.faction,
