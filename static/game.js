@@ -773,7 +773,8 @@ $('btn-confirm-action').addEventListener('click', () => {
         return;
     }
 
-    // 线上模式：直接发送
+    // 线上模式：包装成 select_action 消息
+    action.type = 'select_action';
     send(action);
 
     state.actionConfirmed = true;
