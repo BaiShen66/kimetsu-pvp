@@ -1,0 +1,339 @@
+"""
+FastAPI 服务器 + WebSocket 端点
+管理游戏房间、WebSocket 通信、静态文件服务
+"""
+
+import json
+import asyncio
+import sys
+import io
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from fastapi.responses import HTMLResponse
+
+from game_engine import GameRoom, generate_room_code
+
+# 修复 Windows GBK 编码问题
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # 启动
+    asyncio.create_task(cleanup_rooms())
+    print("极限格斗 PVP 鬼灭之刀 服务器已启动！")
+    print("访问 http://localhost:8000 开始游戏")
+    yield
+    # 关闭
+    pass
+
+
+app = FastAPI(title="极限格斗 PVP 鬼灭之刀", lifespan=lifespan)
+
+# 静态文件和模板
+import os
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+STATIC_DIR = os.path.join(BASE_DIR, "static")
+TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
+
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+# 直接使用 jinja2.Environment 避免 Starlette 版本兼容问题
+from jinja2 import Environment, FileSystemLoader
+jinja_env = Environment(loader=FileSystemLoader(TEMPLATES_DIR), auto_reload=True)
+
+# 房间管理
+rooms: dict[str, GameRoom] = {}
+
+
+def render_template(name: str) -> HTMLResponse:
+    """渲染模板并返回 HTMLResponse"""
+    template = jinja_env.get_template(name)
+    html = template.render()
+    return HTMLResponse(content=html)
+
+
+@app.get("/", response_class=HTMLResponse)
+async def index():
+    """主页：创建/加入房间"""
+    return render_template("index.html")
+
+
+@app.get("/game", response_class=HTMLResponse)
+async def game_page():
+    """游戏页面"""
+    return render_template("game.html")
+
+
+@app.websocket("/ws/{room_code}/{player_id}")
+async def websocket_endpoint(ws: WebSocket, room_code: str, player_id: str):
+    """WebSocket 连接端点"""
+    await ws.accept()
+
+    # 转换 player_id
+    pid = int(player_id) if player_id.isdigit() else 0
+
+    # 如果是已知房间，查找并更新 WebSocket 引用
+    room = rooms.get(room_code)
+    if room and pid in (0, 1):
+        room.state.players[pid].ws = ws
+        room.state.players[pid].connected = True
+        print(f"玩家 {pid} 重新连接到房间 {room_code}")
+
+    try:
+        while True:
+            data = await ws.receive_text()
+            message = json.loads(data)
+            msg_type = message.get("type")
+
+            if msg_type == "create_room":
+                # 生成唯一房间码
+                new_code = generate_room_code()
+                while new_code in rooms:
+                    new_code = generate_room_code()
+
+                room = GameRoom(new_code)
+                rooms[new_code] = room
+                room.setup_characters()
+                room.state.players[0].name = message.get("player_name", "玩家1")
+                room.state.players[0].ws = ws
+                room.state.players[0].connected = True
+
+                await ws.send_text(json.dumps({
+                    "type": "room_created",
+                    "room_code": new_code,
+                    "player_id": 0,
+                    "character": {
+                        "name": room.state.players[0].character.name,
+                        "title": room.state.players[0].character.title,
+                        "faction": room.state.players[0].character.faction,
+                        "emoji": room.state.players[0].character.emoji,
+                        "max_hp": room.state.players[0].character.max_hp,
+                        "skills": [
+                            {"index": i, "name": s.name, "range_type": s.range_type,
+                             "damage": s.damage, "effects": s.effects,
+                             "description": s.description}
+                            for i, s in enumerate(room.state.players[0].character.skills)
+                        ]
+                    }
+                }, ensure_ascii=False))
+
+            elif msg_type == "join_room":
+                join_code = message.get("room_code", "").strip().upper()
+                room = rooms.get(join_code)
+
+                if room is None:
+                    await ws.send_text(json.dumps({
+                        "type": "error", "message": "房间不存在或已过期"
+                    }, ensure_ascii=False))
+                    continue
+
+                if room.state.players[1].connected:
+                    await ws.send_text(json.dumps({
+                        "type": "error", "message": "房间已满"
+                    }, ensure_ascii=False))
+                    continue
+
+                room.state.players[1].name = message.get("player_name", "玩家2")
+                room.state.players[1].ws = ws
+                room.state.players[1].connected = True
+
+                # 通知加入者
+                await ws.send_text(json.dumps({
+                    "type": "room_joined",
+                    "room_code": join_code,
+                    "player_id": 1,
+                    "character": {
+                        "name": room.state.players[1].character.name,
+                        "title": room.state.players[1].character.title,
+                        "faction": room.state.players[1].character.faction,
+                        "emoji": room.state.players[1].character.emoji,
+                        "max_hp": room.state.players[1].character.max_hp,
+                        "skills": [
+                            {"index": i, "name": s.name, "range_type": s.range_type,
+                             "damage": s.damage, "effects": s.effects,
+                             "description": s.description}
+                            for i, s in enumerate(room.state.players[1].character.skills)
+                        ]
+                    }
+                }, ensure_ascii=False))
+
+                # 通知房主：对手已加入
+                if room.state.players[0].ws:
+                    try:
+                        await room.state.players[0].ws.send_text(json.dumps({
+                            "type": "opponent_joined",
+                            "opponent_name": room.state.players[1].name
+                        }, ensure_ascii=False))
+                    except Exception:
+                        pass
+
+            elif msg_type == "select_skills":
+                if room is None:
+                    await ws.send_text(json.dumps({
+                        "type": "error", "message": "未加入房间"
+                    }, ensure_ascii=False))
+                    continue
+
+                # 确定正确的 player_id
+                actual_pid = 0 if room.state.players[0].ws == ws else 1
+                response = await room.handle_message(actual_pid, message)
+                await ws.send_text(json.dumps(response, ensure_ascii=False))
+
+                # 检查双方是否都准备好了
+                if room.all_ready():
+                    room.state.generate_map()
+
+                    # 通知双方游戏开始
+                    for pidx in [0, 1]:
+                        p = room.state.players[pidx]
+                        if p.ws:
+                            try:
+                                st = room.state.get_state_for_player(pidx)
+                                st["type"] = "game_start"
+                                st["player_id"] = pidx
+                                st["player_name"] = p.name
+                                await p.ws.send_text(json.dumps(st, ensure_ascii=False))
+                            except Exception:
+                                pass
+
+            elif msg_type == "select_action":
+                if room is None:
+                    await ws.send_text(json.dumps({
+                        "type": "error", "message": "未加入房间"
+                    }, ensure_ascii=False))
+                    continue
+
+                actual_pid = 0 if room.state.players[0].ws == ws else 1
+                response = await room.handle_message(actual_pid, message)
+                await ws.send_text(json.dumps(response, ensure_ascii=False))
+
+                # 检查双方是否都提交了行动
+                if room.all_actions_received():
+                    turn_result = room.process_turn()
+
+                    # 广播回合结果给双方
+                    for pidx in [0, 1]:
+                        p = room.state.players[pidx]
+                        if p.ws:
+                            try:
+                                st = room.state.get_state_for_player(pidx)
+                                st["type"] = "turn_result"
+                                st["turn_log"] = turn_result["log"]
+                                st["pending_rps"] = room.state.pending_rps and room.state.rps_player_id == pidx
+                                if st["pending_rps"]:
+                                    st["rps_skill_name"] = room.state.rps_skill_name
+                                await p.ws.send_text(json.dumps(st, ensure_ascii=False))
+                            except Exception:
+                                pass
+
+            elif msg_type == "rps_choice":
+                if room is None:
+                    await ws.send_text(json.dumps({
+                        "type": "error", "message": "未加入房间"
+                    }, ensure_ascii=False))
+                    continue
+
+                # 猜拳玩家是人方
+                human_pid = room.state.rps_player_id
+                response = await room.handle_message(human_pid, message)
+
+                # 通知人方猜拳结果
+                human_player = room.state.players[human_pid]
+                if human_player.ws:
+                    try:
+                        response["type"] = "rps_result"
+                        await human_player.ws.send_text(json.dumps(response, ensure_ascii=False))
+                    except Exception:
+                        pass
+
+                # 广播更新后的状态
+                if room.state.game_over:
+                    for pidx in [0, 1]:
+                        p = room.state.players[pidx]
+                        if p.ws:
+                            try:
+                                await p.ws.send_text(json.dumps({
+                                    "type": "game_over",
+                                    "winner": room.state.winner,
+                                    "winner_name": room.state.players[room.state.winner].name if room.state.winner is not None else "",
+                                    "message": f"{room.state.players[room.state.winner].name} 获胜！" if room.state.winner is not None else "平局！"
+                                }, ensure_ascii=False))
+                            except Exception:
+                                pass
+                else:
+                    # 猜拳结束但游戏未结束，广播回合结果（继续下一回合）
+                    for pidx in [0, 1]:
+                        p = room.state.players[pidx]
+                        if p.ws:
+                            try:
+                                st = room.state.get_state_for_player(pidx)
+                                st["type"] = "rps_turn_end"
+                                await p.ws.send_text(json.dumps(st, ensure_ascii=False))
+                            except Exception:
+                                pass
+
+            elif msg_type == "get_state":
+                if room is None:
+                    await ws.send_text(json.dumps({
+                        "type": "error", "message": "房间不存在"
+                    }, ensure_ascii=False))
+                    continue
+
+                actual_pid = 0 if room.state.players[0].ws == ws else 1
+                # 如果 ws 引用尚未关联，使用 URL 中的 pid
+                if room.state.players[0].ws != ws and room.state.players[1].ws != ws:
+                    actual_pid = pid
+
+                st = room.state.get_state_for_player(actual_pid)
+                st["type"] = "game_state"
+                st["player_id"] = actual_pid
+                await ws.send_text(json.dumps(st, ensure_ascii=False))
+
+            else:
+                await ws.send_text(json.dumps({
+                    "type": "error",
+                    "message": f"未知消息类型: {msg_type}"
+                }, ensure_ascii=False))
+
+    except WebSocketDisconnect:
+        if room:
+            actual_pid = 0 if room.state.players[0].ws == ws else 1
+            room.set_player_disconnected(actual_pid)
+            other_pid = 1 - actual_pid
+            other_p = room.state.players[other_pid]
+            if other_p.ws:
+                try:
+                    await other_p.ws.send_text(json.dumps({
+                        "type": "player_disconnected",
+                        "message": "对手已断线，请等待..."
+                    }, ensure_ascii=False))
+                except Exception:
+                    pass
+    except Exception as e:
+        print(f"WebSocket 错误: {e}")
+        if room:
+            actual_pid = 0 if room.state.players[0].ws == ws else 1
+            room.set_player_disconnected(actual_pid)
+
+
+# 定期清理过期房间
+async def cleanup_rooms():
+    """定期清理过期房间"""
+    while True:
+        await asyncio.sleep(300)  # 每5分钟检查一次
+        expired = [code for code, r in rooms.items() if r.is_expired()]
+        for code in expired:
+            del rooms[code]
+        if expired:
+            print(f"清理了 {len(expired)} 个过期房间")
+
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)

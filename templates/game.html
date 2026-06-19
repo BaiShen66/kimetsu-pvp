@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>极限格斗 PVP 鬼灭之刀 - 对战</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="game-body">
+    <div id="game-app">
+        <!-- 顶部信息栏 -->
+        <header class="game-header">
+            <div class="header-left">
+                <span class="game-logo">⚔️ 极限格斗 PVP</span>
+            </div>
+            <div class="header-center">
+                <span class="turn-badge">回合 <span id="turn-number">0</span></span>
+            </div>
+            <div class="header-right">
+                <span id="room-display" class="room-badge">房间：---</span>
+            </div>
+        </header>
+
+        <!-- 主体布局 -->
+        <div class="game-main">
+            <!-- 敌方信息 -->
+            <aside class="player-panel enemy-panel" id="enemy-panel">
+                <div class="panel-header enemy-header">
+                    <span id="enemy-emoji">👹</span>
+                    <h3 id="enemy-name">对手</h3>
+                </div>
+                <div class="hp-section">
+                    <div class="hp-label">HP</div>
+                    <div class="hp-bar-container">
+                        <div class="hp-bar enemy-hp-bar" id="enemy-hp-bar"></div>
+                    </div>
+                    <div class="hp-text" id="enemy-hp-text">4/4</div>
+                </div>
+                <div id="enemy-status" class="status-badge"></div>
+                <div class="skill-list" id="enemy-skills"></div>
+            </aside>
+
+            <!-- 地图 -->
+            <main class="map-container">
+                <div class="map-wrapper">
+                    <div id="game-map" class="game-map"></div>
+                </div>
+                <!-- 图例 -->
+                <div class="map-legend">
+                    <span class="legend-item"><span class="legend-dot self-dot"></span> 你</span>
+                    <span class="legend-item"><span class="legend-dot enemy-dot"></span> 对手</span>
+                    <span class="legend-item"><span class="legend-dot move-dot"></span> 可移动</span>
+                    <span class="legend-item"><span class="legend-dot attack-dot"></span> 攻击范围</span>
+                    <span class="legend-item"><span class="legend-dot obstacle-dot"></span> 障碍物</span>
+                </div>
+            </main>
+
+            <!-- 战斗日志 -->
+            <aside class="log-panel">
+                <h3>📜 战斗日志</h3>
+                <div id="battle-log" class="battle-log"></div>
+            </aside>
+        </div>
+
+        <!-- 下方：行动选择 -->
+        <footer class="action-bar">
+            <div class="your-info">
+                <span id="your-emoji">⚔️</span>
+                <span id="your-name">你</span>
+                <div class="hp-section mini">
+                    <div class="hp-bar-container">
+                        <div class="hp-bar your-hp-bar" id="your-hp-bar"></div>
+                    </div>
+                    <span class="hp-text" id="your-hp-text">4/4</span>
+                </div>
+                <span id="your-status" class="status-badge"></span>
+            </div>
+
+            <div class="action-buttons" id="action-buttons">
+                <button id="btn-move" class="btn btn-action" data-action="move">
+                    🚶 移动
+                </button>
+                <button id="btn-skill-0" class="btn btn-action btn-skill" data-action="skill" data-index="0">
+                    技能1
+                </button>
+                <button id="btn-skill-1" class="btn btn-action btn-skill" data-action="skill" data-index="1">
+                    技能2
+                </button>
+                <button id="btn-skill-2" class="btn btn-action btn-skill" data-action="skill" data-index="2">
+                    技能3
+                </button>
+            </div>
+
+            <div class="confirm-section">
+                <div id="direction-picker" class="direction-picker hidden">
+                    <div class="direction-grid">
+                        <button class="dir-btn" data-dir="ul">↖</button>
+                        <button class="dir-btn" data-dir="up">↑</button>
+                        <button class="dir-btn" data-dir="ur">↗</button>
+                        <button class="dir-btn" data-dir="left">←</button>
+                        <button class="dir-btn dir-center" disabled>◎</button>
+                        <button class="dir-btn" data-dir="right">→</button>
+                        <button class="dir-btn" data-dir="dl">↙</button>
+                        <button class="dir-btn" data-dir="down">↓</button>
+                        <button class="dir-btn" data-dir="dr">↘</button>
+                    </div>
+                </div>
+                <button id="btn-confirm-action" class="btn btn-confirm" disabled>
+                    ✅ 确认行动
+                </button>
+                <button id="btn-cancel-action" class="btn btn-cancel hidden">
+                    ❌ 取消
+                </button>
+            </div>
+
+            <div id="waiting-indicator" class="waiting-indicator hidden">
+                <div class="loading-spinner"></div>
+                <p>等待对手...</p>
+            </div>
+        </footer>
+
+        <!-- 猜拳弹窗 -->
+        <div id="rps-modal" class="modal hidden">
+            <div class="modal-content">
+                <h2>✊ 猜拳判定！</h2>
+                <p id="rps-skill-name">技能命中，请猜拳决定伤害</p>
+                <div class="rps-timer">剩余时间：<span id="rps-countdown">5</span>秒</div>
+                <div class="rps-buttons">
+                    <button class="rps-btn" data-choice="rock">
+                        <span class="rps-icon">✊</span>
+                        <span>石头</span>
+                    </button>
+                    <button class="rps-btn" data-choice="scissors">
+                        <span class="rps-icon">✌️</span>
+                        <span>剪刀</span>
+                    </button>
+                    <button class="rps-btn" data-choice="paper">
+                        <span class="rps-icon">🖐️</span>
+                        <span>布</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 游戏结束弹窗 -->
+        <div id="game-over-modal" class="modal hidden">
+            <div class="modal-content game-over-content">
+                <h1 id="game-over-title"></h1>
+                <p id="game-over-message"></p>
+                <button id="btn-new-game" class="btn btn-primary" onclick="location.reload()">
+                    🔄 再来一局
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/game.js"></script>
+</body>
+</html>

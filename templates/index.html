@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>极限格斗 PVP 鬼灭之刀</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div id="app">
+        <!-- 阶段1: 大厅 - 创建/加入房间 -->
+        <div id="lobby-phase" class="phase active">
+            <div class="title-section">
+                <h1 class="game-title">⚔️ 极限格斗 PVP</h1>
+                <h2 class="game-subtitle">鬼灭之刀</h2>
+            </div>
+
+            <div class="lobby-card">
+                <div class="input-group">
+                    <label>玩家名称</label>
+                    <input type="text" id="player-name" placeholder="输入你的名称" maxlength="10">
+                </div>
+
+                <div class="lobby-buttons">
+                    <button id="btn-create" class="btn btn-primary">
+                        <span class="btn-icon">🏠</span> 创建房间
+                    </button>
+                    <div class="divider">
+                        <span>或</span>
+                    </div>
+                    <div class="join-section">
+                        <input type="text" id="room-code-input" placeholder="输入6位房间码" maxlength="6" style="text-transform: uppercase;">
+                        <button id="btn-join" class="btn btn-secondary">
+                            <span class="btn-icon">🚪</span> 加入房间
+                        </button>
+                    </div>
+                </div>
+
+                <div id="room-info" class="room-info hidden">
+                    <div class="room-code-display">
+                        <span class="label">房间码：</span>
+                        <span id="room-code-text" class="code-text"></span>
+                    </div>
+                    <p class="waiting-text">等待对手加入中...</p>
+                    <div class="loading-spinner"></div>
+                </div>
+
+                <div id="lobby-error" class="error-message hidden"></div>
+            </div>
+        </div>
+
+        <!-- 阶段2: 选择技能 -->
+        <div id="skill-phase" class="phase">
+            <div class="title-section">
+                <h2>选择出战技能</h2>
+                <p id="character-info-text"></p>
+            </div>
+
+            <div class="skill-selection">
+                <div id="skill-pool" class="skill-grid"></div>
+                <div class="skill-select-info">
+                    <p>已选择：<span id="selected-count">0</span> / <span id="required-count">3</span></p>
+                    <button id="btn-confirm-skills" class="btn btn-primary" disabled>确认技能</button>
+                </div>
+            </div>
+
+            <div id="skill-error" class="error-message hidden"></div>
+            <p class="waiting-text hidden" id="waiting-opponent-skills">等待对手确认技能...</p>
+        </div>
+
+        <!-- 阶段3: 跳转提示 -->
+        <div id="redirect-phase" class="phase">
+            <div class="title-section">
+                <h2>⚔️ 双方已就绪！</h2>
+                <p>正在进入战场...</p>
+                <div class="loading-spinner"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ========== 全局状态 ==========
+        let ws = null;
+        let roomCode = null;
+        let playerId = null;
+        let playerName = '';
+        let characterData = null;
+
+        // ========== DOM 元素 ==========
+        const $ = (id) => document.getElementById(id);
+
+        // ========== 阶段切换 ==========
+        function showPhase(phaseName) {
+            document.querySelectorAll('.phase').forEach(el => el.classList.remove('active'));
+            const target = $(phaseName + '-phase');
+            if (target) target.classList.add('active');
+        }
+
+        // ========== WebSocket 连接 ==========
+        function connectWebSocket(room, pid) {
+            const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${location.host}/ws/${room}/${pid}`;
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = () => {
+                console.log('WebSocket 已连接');
+            };
+
+            ws.onmessage = (event) => {
+                const msg = JSON.parse(event.data);
+                handleMessage(msg);
+            };
+
+            ws.onclose = () => {
+                console.log('WebSocket 已断开');
+                showError('lobby-error', '连接已断开，请刷新页面重试');
+            };
+
+            ws.onerror = (err) => {
+                console.error('WebSocket 错误:', err);
+                showError('lobby-error', '连接失败，请检查网络');
+            };
+        }
+
+        function send(msg) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify(msg));
+            }
+        }
+
+        // ========== 消息处理 ==========
+        function handleMessage(msg) {
+            console.log('收到消息:', msg);
+
+            switch (msg.type) {
+                case 'room_created':
+                    roomCode = msg.room_code;
+                    playerId = msg.player_id;
+                    characterData = msg.character;
+                    $('room-code-text').textContent = roomCode;
+                    $('room-info').classList.remove('hidden');
+                    $('btn-create').disabled = true;
+                    $('btn-join').disabled = true;
+                    hideError('lobby-error');
+                    break;
+
+                case 'room_joined':
+                    roomCode = msg.room_code;
+                    playerId = msg.player_id;
+                    characterData = msg.character;
+                    showSkillSelection();
+                    break;
+
+                case 'opponent_joined':
+                    $('waiting-text').style.display = 'none';
+                    showSkillSelection();
+                    break;
+
+                case 'skills_confirmed':
+                    $('btn-confirm-skills').disabled = true;
+                    $('btn-confirm-skills').textContent = '已确认';
+                    $('waiting-opponent-skills').classList.remove('hidden');
+                    break;
+
+                case 'game_start':
+                    // 保存游戏状态到 sessionStorage，跳转到游戏页面
+                    sessionStorage.setItem('gameState', JSON.stringify({
+                        roomCode: roomCode,
+                        playerId: playerId,
+                        playerName: playerName
+                    }));
+                    showPhase('redirect');
+                    setTimeout(() => {
+                        window.location.href = `/game?room=${roomCode}&player=${playerId}`;
+                    }, 800);
+                    break;
+
+                case 'error':
+                    showError('lobby-error', msg.message);
+                    if (msg.message.includes('技能')) {
+                        showError('skill-error', msg.message);
+                    }
+                    break;
+            }
+        }
+
+        // ========== 技能选择 ==========
+        let selectedSkills = new Set();
+
+        function showSkillSelection() {
+            showPhase('skill');
+
+            if (characterData) {
+                $('character-info-text').textContent =
+                    `角色：${characterData.emoji} ${characterData.name}（${characterData.faction === 'human' ? '鬼杀队' : '鬼'}）`;
+
+                const isDemon = characterData.faction === 'demon';
+                $('required-count').textContent = isDemon ? '3（自动选择）' : '3';
+                $('selected-count').textContent = isDemon ? '3' : '0';
+
+                const pool = $('skill-pool');
+                pool.innerHTML = '';
+
+                characterData.skills.forEach((skill, index) => {
+                    const card = document.createElement('div');
+                    card.className = 'skill-card';
+                    card.innerHTML = `
+                        <div class="skill-name">${skill.name}</div>
+                        <div class="skill-type">${getRangeTypeName(skill.range_type)}</div>
+                        <div class="skill-damage">伤害：${skill.damage}</div>
+                        <div class="skill-effects">${skill.effects.join(' · ')}</div>
+                        <div class="skill-desc">${skill.description}</div>
+                    `;
+
+                    if (isDemon) {
+                        card.classList.add('selected');
+                        selectedSkills.add(index);
+                    }
+
+                    card.addEventListener('click', () => {
+                        if (isDemon) return; // 鬼方自动全选
+
+                        if (selectedSkills.has(index)) {
+                            selectedSkills.delete(index);
+                            card.classList.remove('selected');
+                        } else if (selectedSkills.size < 3) {
+                            selectedSkills.add(index);
+                            card.classList.add('selected');
+                        }
+
+                        $('selected-count').textContent = selectedSkills.size;
+                        $('btn-confirm-skills').disabled = selectedSkills.size !== 3;
+                    });
+
+                    pool.appendChild(card);
+                });
+
+                if (isDemon) {
+                    $('btn-confirm-skills').disabled = false;
+                }
+            }
+        }
+
+        function getRangeTypeName(type) {
+            const names = {
+                'line': '直线',
+                'self_aura': '自身光环',
+                'square_3x3': '3×3正方形',
+                'dash_surround': '位移环绕',
+                'four_way': '四向',
+                'multi_dash': '多向突进'
+            };
+            return names[type] || type;
+        }
+
+        // ========== 错误显示 ==========
+        function showError(elementId, message) {
+            const el = $(elementId);
+            if (el) {
+                el.textContent = message;
+                el.classList.remove('hidden');
+            }
+        }
+
+        function hideError(elementId) {
+            const el = $(elementId);
+            if (el) {
+                el.classList.add('hidden');
+            }
+        }
+
+        // ========== 事件绑定 ==========
+        $('btn-create').addEventListener('click', () => {
+            playerName = $('player-name').value.trim();
+            if (!playerName) {
+                showError('lobby-error', '请输入玩家名称');
+                return;
+            }
+            hideError('lobby-error');
+            connectWebSocket('lobby', 0);
+
+            // 等待连接后发送创建房间消息
+            const checkConnection = setInterval(() => {
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    clearInterval(checkConnection);
+                    send({ type: 'create_room', player_name: playerName });
+                }
+            }, 100);
+        });
+
+        $('btn-join').addEventListener('click', () => {
+            playerName = $('player-name').value.trim();
+            const code = $('room-code-input').value.trim().toUpperCase();
+
+            if (!playerName) {
+                showError('lobby-error', '请输入玩家名称');
+                return;
+            }
+            if (!code || code.length !== 6) {
+                showError('lobby-error', '请输入6位房间码');
+                return;
+            }
+
+            hideError('lobby-error');
+            connectWebSocket(code, 1);
+
+            const checkConnection = setInterval(() => {
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    clearInterval(checkConnection);
+                    send({ type: 'join_room', room_code: code, player_name: playerName });
+                }
+            }, 100);
+        });
+
+        $('btn-confirm-skills').addEventListener('click', () => {
+            if (selectedSkills.size !== 3 && characterData && characterData.faction !== 'demon') {
+                showError('skill-error', '请选择3个技能');
+                return;
+            }
+
+            hideError('skill-error');
+
+            if (characterData && characterData.faction === 'demon') {
+                // 鬼方自动发送全选
+                send({ type: 'select_skills', skill_indices: [0, 1, 2] });
+            } else {
+                send({
+                    type: 'select_skills',
+                    skill_indices: Array.from(selectedSkills).sort()
+                });
+            }
+        });
+
+        // ========== 初始化 ==========
+        console.log('⚔️ 极限格斗 PVP 鬼灭之刀 - 大厅已就绪');
+    </script>
+</body>
+</html>
