@@ -250,6 +250,44 @@ input[type="text"]:focus {
     max-width: 480px;
 }
 
+/* 大厅玩家卡片 */
+.player-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 14px 18px;
+    margin-bottom: 20px;
+}
+
+.player-card-icon {
+    font-size: 32px;
+}
+
+.player-card-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.player-card-name {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.player-card-id {
+    font-size: 11px;
+    color: var(--text-dim);
+    font-family: "Courier New", monospace;
+}
+
+.player-card .btn {
+    flex-shrink: 0;
+}
+
 .lobby-buttons {
     display: flex;
     flex-direction: column;

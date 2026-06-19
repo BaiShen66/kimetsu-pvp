@@ -42,9 +42,13 @@
             </div>
 
             <div class="lobby-card">
-                <div class="input-group">
-                    <label>玩家名称</label>
-                    <input type="text" id="player-name" placeholder="输入你的名称" maxlength="10">
+                <div class="player-card">
+                    <span class="player-card-icon">🎮</span>
+                    <div class="player-card-info">
+                        <span id="display-name" class="player-card-name"></span>
+                        <span id="display-id" class="player-card-id"></span>
+                    </div>
+                    <button id="btn-edit-name" class="btn btn-sm">✏️</button>
                 </div>
 
                 <div class="lobby-buttons">
@@ -116,18 +120,32 @@
     <script src="/static/player.js"></script>
     <script>
         // ========== 玩家系统 ==========
-        function updatePlayerBar() {
-            $('player-display-name').textContent = Player.getName();
-            $('player-display-id').textContent = '#' + Player.getId();
-            $('player-name').value = Player.getName();
+        function updatePlayerUI() {
+            const name = Player.getName();
+            const id = Player.getId();
+            // 顶部栏
+            const topName = $('player-display-name');
+            const topId = $('player-display-id');
+            if (topName) topName.textContent = name;
+            if (topId) topId.textContent = '#' + id;
+            // 大厅卡片
+            const cardName = $('display-name');
+            const cardId = $('display-id');
+            if (cardName) cardName.textContent = name;
+            if (cardId) cardId.textContent = 'ID: ' + id;
         }
 
         // 改名弹窗
-        $('btn-edit-name').addEventListener('click', () => {
+        function openNameModal() {
             $('new-player-name').value = Player.getName();
             $('name-modal').classList.remove('hidden');
             $('name-error').classList.add('hidden');
-        });
+        }
+
+        // 两个改名按钮绑定同一个弹窗
+        $('btn-edit-name').addEventListener('click', openNameModal);
+        const topEditBtn = document.querySelector('#player-bar #btn-edit-name');
+        if (topEditBtn) topEditBtn.addEventListener('click', openNameModal);
 
         $('btn-cancel-name').addEventListener('click', () => {
             $('name-modal').classList.add('hidden');
@@ -147,27 +165,29 @@
             }
             Player.setName(newName);
             $('name-modal').classList.add('hidden');
-            updatePlayerBar();
+            updatePlayerUI();
         });
 
-        // Enter 保存
         $('new-player-name').addEventListener('keydown', (e) => {
             if (e.key === 'Enter') $('btn-save-name').click();
         });
 
-        // 点击弹窗外部关闭
         $('name-modal').addEventListener('click', (e) => {
             if (e.target === $('name-modal')) $('name-modal').classList.add('hidden');
         });
 
-        updatePlayerBar();
+        updatePlayerUI();
 
         // ========== 全局状态 ==========
         let ws = null;
         let roomCode = null;
         let playerId = null;
-        let playerName = Player.getName();
         let characterData = null;
+
+        // 直接取缓存名字，不再读输入框
+        function getPlayerName() {
+            return Player.getName();
+        }
 
         // ========== DOM 元素 ==========
         const $ = (id) => document.getElementById(id);
@@ -354,7 +374,7 @@
 
         // ========== 事件绑定 ==========
         $('btn-create').addEventListener('click', () => {
-            playerName = $('player-name').value.trim();
+            playerName = getPlayerName();
             if (!playerName) {
                 showError('lobby-error', '请输入玩家名称');
                 return;
@@ -372,7 +392,7 @@
         });
 
         $('btn-join').addEventListener('click', () => {
-            playerName = $('player-name').value.trim();
+            playerName = getPlayerName();
             const code = $('room-code-input').value.trim().toUpperCase();
 
             if (!playerName) {
