@@ -299,7 +299,8 @@ async def websocket_endpoint(ws: WebSocket, room_code: str, player_id: str):
                                     "type": "game_over",
                                     "winner": room.state.winner,
                                     "winner_name": room.state.players[room.state.winner].name if room.state.winner is not None else "",
-                                    "message": f"{room.state.players[room.state.winner].name} 获胜！" if room.state.winner is not None else "平局！"
+                                    "message": f"{room.state.players[room.state.winner].name} 获胜！" if room.state.winner is not None else "平局！",
+                                    "battle_history": room.state.battle_history,
                                 }, ensure_ascii=False))
                             except Exception:
                                 pass

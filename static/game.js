@@ -179,6 +179,8 @@ function handleMessage(msg) {
 
             // 检查游戏结束
             if (msg.game_over) {
+                state.gameOver = true;
+                saveBattleRecord(msg);
                 showGameOver(msg);
             }
             break;
@@ -205,6 +207,7 @@ function handleMessage(msg) {
 
         case 'game_over':
             state.gameOver = true;
+            saveBattleRecord(msg);
             showGameOver(msg);
             break;
 
@@ -881,6 +884,30 @@ $('room-display').textContent = `房间：${ROOM_CODE}`;
 // 显示玩家信息
 if (window.Player) {
     $('player-name-display').textContent = `🎮 ${Player.getName()}`;
+}
+
+// ========== 战斗记录保存 ==========
+function saveBattleRecord(msg) {
+    if (!window.BattleRecords) return;
+    if (!msg.battle_history || msg.battle_history.length === 0) return;
+
+    const record = {
+        history: msg.battle_history,
+        winner: msg.winner,
+        winnerName: msg.winner_name || '',
+        players: [],
+    };
+
+    const firstTurn = msg.battle_history[0];
+    if (firstTurn && firstTurn.players) {
+        record.players = firstTurn.players.map(p => ({
+            name: p.name,
+            player_id: p.player_id,
+        }));
+    }
+
+    BattleRecords.save(record);
+    console.log('战斗记录已保存到本地');
 }
 
 // 连接 WebSocket

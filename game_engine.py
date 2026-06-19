@@ -60,6 +60,7 @@ class GameState:
         self.rps_player_id: int = 0     # 需要猜拳的玩家
         self.rps_skill_name: str = ""   # 触发猜拳的技能名
         self._rps_damage_pending: float = 0  # 猜拳中暂存的伤害值
+        self.battle_history: List[dict] = []  # 完整战斗记录
 
     def generate_map(self):
         """随机生成地图（含障碍物）"""
@@ -452,6 +453,29 @@ class GameState:
 
         self.log.extend(turn_log)
 
+        # 记录本回合到战斗历史
+        turn_record = {
+            "turn": self.turn,
+            "players": [],
+        }
+        for pid in [0, 1]:
+            p = self.players[pid]
+            r = results.get(pid, {})
+            turn_record["players"].append({
+                "player_id": pid,
+                "name": p.name,
+                "action": actions.get(pid, {}).get("action", "pass"),
+                "skill_name": r.get("skill_name", ""),
+                "position": list(p.position),
+                "hp": p.hp,
+                "damage_dealt": r.get("damage_dealt", 0),
+                "stunned": p.stunned,
+                "attack_cancelled": r.get("attack_cancelled", False),
+                "move_cancelled": r.get("move_cancelled", False),
+            })
+        turn_record["log"] = turn_log
+        self.battle_history.append(turn_record)
+
         return {
             "turn": self.turn,
             "results": results,
@@ -567,6 +591,7 @@ class GameState:
             "game_over": self.game_over,
             "winner": self.winner,
             "pending_rps": self.pending_rps and self.rps_player_id == player_id,
+            "battle_history": self.battle_history if self.game_over else [],
         }
 
     def get_movable_cells_with_direction(self, player_id: int) -> dict:
