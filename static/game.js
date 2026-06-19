@@ -161,24 +161,28 @@ function handleMessage(msg) {
             if (IS_OFFLINE && msg.for_player !== undefined) {
                 state.bothStates = state.bothStates || {};
                 state.bothStates[msg.for_player] = msg;
+                console.log('离线状态存入 pid=' + msg.for_player, 'HP=' + msg.your_hp, 'Skills=' + (msg.your_skills||[]).length);
                 updateFullState(msg);
-                // 双方状态都收到后，开始操控玩家0（人方）
-                if (state.bothStates[0] && state.bothStates[1] && state.controllingPlayer === 0 && !state._initialized) {
+
+                if (state.bothStates[0] && state.bothStates[1] && !state._initialized) {
                     state._initialized = true;
                     state.controllingPlayer = 0;
                     updateFullState(state.bothStates[0]);
-                    $$('.btn-action').forEach(b => b.disabled = false);
+                    // 强制启用按钮
+                    ['btn-stay', 'btn-move', 'btn-skill-0', 'btn-skill-1', 'btn-skill-2'].forEach(id => {
+                        const b = $(id); if (b) b.disabled = false;
+                    });
                     updateSkillButtons();
                     renderMap();
                     updateConfirmButton();
-                    console.log('离线模式初始化完成');
+                    const name = state.yourCharacter?.name || '?';
+                    $('controlling-label').textContent = '当前操控: ' + name;
+                    console.log('离线模式就绪, 操控=' + name, '按键已启用');
                 }
             } else {
                 updateFullState(msg);
             }
-            if (msg.type === 'game_start') {
-                addLog('⚔️ 战斗开始！');
-            }
+            if (msg.type === 'game_start') addLog('⚔️ 战斗开始！');
             break;
 
         case 'turn_result':

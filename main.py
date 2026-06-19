@@ -247,6 +247,12 @@ async def websocket_endpoint(ws: WebSocket, room_code: str, player_id: str):
                 room.host_player_id = message.get("player_id", "")
                 room.offline_mode = True
 
+                # 确认鬼方技能
+                try:
+                    await room.handle_message(1, {"type": "select_skills", "skill_indices": [0, 1, 2]})
+                except Exception as e:
+                    print(f"离线鬼方技能确认失败: {e}")
+
                 await ws.send_text(json.dumps({
                     "type": "room_created",
                     "room_code": new_code,
@@ -450,14 +456,7 @@ async def websocket_endpoint(ws: WebSocket, room_code: str, player_id: str):
                 response = await room.handle_message(actual_pid, message)
                 await ws.send_text(json.dumps(response, ensure_ascii=False))
 
-                # 线下模式：自动确认鬼方技能
-                if getattr(room, 'offline_mode', False) and actual_pid == 0:
-                    try:
-                        await room.handle_message(1, {"type": "select_skills", "skill_indices": [0, 1, 2]})
-                    except Exception:
-                        pass
-
-                # 检查双方是否都准备好了
+                # 检查双方是否都准备好了（离线模式鬼方在create时已确认）
                 if room.all_ready():
                     room.state.generate_map()
 
