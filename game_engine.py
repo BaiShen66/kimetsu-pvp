@@ -250,10 +250,13 @@ class GameState:
             direction = action.get("direction")
             if direction and direction in DIRECTIONS:
                 r, c = p.position
-                dr, dc = DIRECTIONS[direction]
-                nr, nc = r + dr, c + dc
-                if self.is_passable(nr, nc):
-                    result["moved_to"] = (nr, nc)
+                if direction == "stay":
+                    result["moved_to"] = (r, c)
+                else:
+                    dr, dc = DIRECTIONS[direction]
+                    nr, nc = r + dr, c + dc
+                    if self.is_passable(nr, nc):
+                        result["moved_to"] = (nr, nc)
 
         elif action_type == "skill":
             skill_index = action.get("skill_index", 0)

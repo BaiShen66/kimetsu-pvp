@@ -685,8 +685,8 @@ $$('.dir-btn').forEach(btn => {
         // 高亮对应方向的格子
         if (state.selectedAction === 'move') {
             const [r, c] = state.yourPos;
-            const dirMap = { ul: [-1, -1], up: [-1, 0], ur: [-1, 1], left: [0, -1], right: [0, 1], dl: [1, -1], down: [1, 0], dr: [1, 1] };
-            const [dr, dc] = dirMap[dir];
+            const dirMap = { ul: [-1, -1], up: [-1, 0], ur: [-1, 1], left: [0, -1], right: [0, 1], dl: [1, -1], down: [1, 0], dr: [1, 1], stay: [0, 0] };
+            const [dr, dc] = dirMap[dir] || [0, 0];
             const nr = r + dr, nc = c + dc;
             state.highlightedCells = [{ r: nr, c: nc, type: 'direction' }];
             renderMap();

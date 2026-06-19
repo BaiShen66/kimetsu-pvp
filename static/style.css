@@ -1231,9 +1231,13 @@ input[type="text"]:focus {
     border-color: var(--accent-gold);
 }
 
-.dir-center {
-    cursor: default;
-    opacity: 0.3;
+.dir-btn[data-dir="stay"] {
+    opacity: 0.7;
+}
+.dir-btn[data-dir="stay"]:hover {
+    opacity: 1;
+    background: rgba(0, 212, 255, 0.2);
+    border-color: var(--self-blue);
 }
 
 /* ========== 猜拳弹窗 ========== */

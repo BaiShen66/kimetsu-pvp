@@ -138,16 +138,17 @@ def get_character_by_name(name: str) -> Character:
     return None
 
 
-# 8个移动方向 (dr, dc)
+# 9个移动方向 (dr, dc)，含原地不动
 DIRECTIONS = {
     "up": (-1, 0),
     "down": (1, 0),
     "left": (0, -1),
     "right": (0, 1),
-    "ul": (-1, -1),   # 左上
-    "ur": (-1, 1),    # 右上
-    "dl": (1, -1),    # 左下
-    "dr": (1, 1),     # 右下
+    "ul": (-1, -1),
+    "ur": (-1, 1),
+    "dl": (1, -1),
+    "dr": (1, 1),
+    "stay": (0, 0),
 }
 
 # 方向对应的显示名称
