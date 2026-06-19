@@ -84,8 +84,7 @@ async def _process_and_broadcast_turn(room):
                 st["type"] = "turn_result"
                 st["for_player"] = pidx
                 st["turn_log"] = turn_result["log"]
-                st["pending_rps"] = room.state.pending_rps
-                st["rps_role"] = "attacker" if (room.state.pending_rps and pidx == room.state.rps_human_pid) else ("defender" if room.state.pending_rps else None)
+                st["pending_rps"] = room.state.pending_rps and room.state.rps_player_id == pidx
                 if st["pending_rps"]:
                     st["rps_skill_name"] = room.state.rps_skill_name
                 await p.ws.send_text(json.dumps(st, ensure_ascii=False))
@@ -450,22 +449,32 @@ async def websocket_endpoint(ws: WebSocket, room_code: str, player_id: str):
                     }, ensure_ascii=False))
                     continue
 
-                # 提交猜拳（双方都要选）
-                response = await room.handle_message(pid, message)
+                # 猜拳玩家是人方
+                human_pid = room.state.rps_player_id
+                response = await room.handle_message(human_pid, message)
 
-                if response.get("waiting"):
-                    await ws.send_text(json.dumps({"type": "rps_waiting"}, ensure_ascii=False))
-                else:
-                    for pidx in [0, 1]:
-                        p = room.state.players[pidx]
-                        if p.ws:
-                            try:
-                                response["type"] = "rps_result"
-                                await p.ws.send_text(json.dumps(response, ensure_ascii=False))
-                            except Exception:
-                                pass
+                # 通知人方猜拳结果
+                human_player = room.state.players[human_pid]
+                if human_player.ws:
+                    try:
+                        response["type"] = "rps_result"
+                        await human_player.ws.send_text(json.dumps(response, ensure_ascii=False))
+                    except Exception:
+                        pass
 
-                if room.state.game_over:
+                # 平局：重新发猜拳请求
+                if response.get("retry"):
+                    if human_player.ws:
+                        try:
+                            st = room.state.get_state_for_player(human_pid)
+                            st["type"] = "turn_result"
+                            st["pending_rps"] = True
+                            st["rps_skill_name"] = room.state.rps_skill_name
+                            st["for_player"] = human_pid
+                            await human_player.ws.send_text(json.dumps(st, ensure_ascii=False))
+                        except Exception:
+                            pass
+                elif room.state.game_over:
                     for pidx in [0, 1]:
                         p = room.state.players[pidx]
                         if p.ws:
