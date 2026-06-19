@@ -201,8 +201,12 @@ function handleMessage(msg) {
             }
 
             // 检查是否有待处理的猜拳
-            if (msg.pending_rps && (!IS_OFFLINE || msg.for_player === 0)) {
-                showRPSModal(msg.rps_skill_name);
+            if (msg.pending_rps) {
+                if (IS_OFFLINE) {
+                    showOfflineRPS(msg);
+                } else {
+                    showRPSModal(msg.rps_skill_name, msg.rps_role || 'attacker');
+                }
             }
 
             // 检查游戏结束
@@ -214,21 +218,15 @@ function handleMessage(msg) {
             break;
 
         case 'rps_result':
-            addLog(`✊ 你出 ${getRPSName(msg.human_choice)}，鬼出 ${getRPSName(msg.demon_choice)} — ${msg.result === 'win' ? '胜利！' : msg.result === 'draw' ? '平局！再来！' : '失败'}`);
-            if (msg.damage > 0) {
-                addLog(`💥 造成 ${msg.damage} 点伤害！`);
+            if (msg.result === 'win') {
+                addLog(`⚔️ 砍头成功！${getRPSName(msg.human_choice)} vs ${getRPSName(msg.demon_choice)} — ${msg.result === 'win' ? '斩杀！' : ''}`);
+            } else {
+                addLog(`✊ ${getRPSName(msg.human_choice)} vs ${getRPSName(msg.demon_choice)} — ${msg.result === 'draw' ? '平局，没砍下头' : '鬼防住了'}`);
             }
+            hideRPSModal();
             if (msg.game_over) {
-                hideRPSModal();
                 state.gameOver = true;
                 showGameOver(msg);
-            } else if (msg.retry) {
-                // 平局继续猜拳，不关闭弹窗
-                state.rpsSeconds = 5;
-                $('rps-countdown').textContent = state.rpsSeconds;
-                $('rps-countdown').parentElement.classList.remove('urgent');
-            } else {
-                hideRPSModal();
             }
             break;
 
@@ -353,11 +351,11 @@ function updateSkillButtons() {
         }
     }
 
-    // 移动按钮
+    // 移动和原地按钮
     const moveBtn = $('btn-move');
-    if (moveBtn) {
-        moveBtn.disabled = state.actionConfirmed || state.yourStunned;
-    }
+    const stayBtn = $('btn-stay');
+    if (moveBtn) moveBtn.disabled = state.actionConfirmed || state.yourStunned;
+    if (stayBtn) stayBtn.disabled = state.actionConfirmed || state.yourStunned;
 }
 
 function updateEnemySkills() {
@@ -503,8 +501,9 @@ function getCurrentSkillRangeType() {
 // ========== 方向选择器 ==========
 function updateDirectionPicker(direction) {
     const picker = $('direction-picker');
-    const needsDir = state.selectedAction === 'move' ||
-        (state.selectedAction === 'skill' && needsDirection(getCurrentSkillRangeType()));
+    const needsDir = state.selectedAction === 'stay' ? false :
+        (state.selectedAction === 'move' ||
+        (state.selectedAction === 'skill' && needsDirection(getCurrentSkillRangeType())));
 
     if (!needsDir || !state.selectedAction) {
         picker.classList.add('hidden');
@@ -531,8 +530,9 @@ function updateConfirmButton() {
         return;
     }
 
-    const needsDir = state.selectedAction === 'move' ||
-        (state.selectedAction === 'skill' && needsDirection(getCurrentSkillRangeType()));
+    const needsDir = state.selectedAction === 'stay' ? false :
+        (state.selectedAction === 'move' ||
+        (state.selectedAction === 'skill' && needsDirection(getCurrentSkillRangeType())));
 
     if (needsDir && !state.selectedDirection) {
         btn.disabled = true;
@@ -544,6 +544,18 @@ function updateConfirmButton() {
 }
 
 // ========== 行动选择 ==========
+$('btn-stay').addEventListener('click', () => {
+    if (state.actionConfirmed || state.yourStunned) return;
+    clearActionHighlights();
+    state.selectedAction = 'stay';
+    state.selectedDirection = null;
+    $$('.btn-action').forEach(b => b.classList.remove('active'));
+    $('btn-stay').classList.add('active');
+    $('direction-picker').classList.add('hidden');
+    updateConfirmButton();
+    renderMap();
+});
+
 $('btn-move').addEventListener('click', () => {
     if (state.actionConfirmed || state.yourStunned) return;
 
@@ -735,7 +747,9 @@ $('btn-confirm-action').addEventListener('click', () => {
     if (state.actionConfirmed) return;
 
     const action = {};
-    if (state.selectedAction === 'move') {
+    if (state.selectedAction === 'stay') {
+        action.action = 'stay';
+    } else if (state.selectedAction === 'move') {
         action.action = 'move';
         action.direction = state.selectedDirection;
     } else if (state.selectedAction === 'skill') {
@@ -814,8 +828,36 @@ function showWaiting() {
     $$('.btn-action').forEach(b => b.disabled = true);
 }
 
-// ========== 猜拳弹窗 ==========
-function showRPSModal(skillName) {
+// ========== 猜拳 ==========
+let offlineRPS = {}; // {attacker: choice, defender: choice}
+
+function showOfflineRPS(msg) {
+    const role = msg.rps_role || (state.controllingPlayer === 0 ? 'attacker' : 'defender');
+    const label = role === 'attacker' ? '人方攻击！选砍头方向' : '鬼方防御！选防守方向';
+    showRPSModal(label, role);
+}
+
+function showRPSModal(label, role) {
+    state.pendingRPS = true;
+    state.rpsSeconds = 5;
+    $('rps-skill-name').textContent = label || '猜拳判定！';
+    $('rps-countdown').textContent = state.rpsSeconds;
+    $('rps-countdown').parentElement.classList.remove('urgent');
+    // 设置当前角色
+    $('rps-modal').dataset.role = role || 'attacker';
+    $('rps-modal').classList.remove('hidden');
+
+    if (state.rpsTimer) clearInterval(state.rpsTimer);
+    state.rpsTimer = setInterval(() => {
+        state.rpsSeconds--;
+        $('rps-countdown').textContent = state.rpsSeconds;
+        if (state.rpsSeconds <= 2) $('rps-countdown').parentElement.classList.add('urgent');
+        if (state.rpsSeconds <= 0) {
+            clearInterval(state.rpsTimer);
+            submitRPS(['rock', 'scissors', 'paper'][Math.floor(Math.random() * 3)]);
+        }
+    }, 1000);
+}
     state.pendingRPS = true;
     state.rpsSeconds = 5;
 
@@ -852,8 +894,26 @@ function hideRPSModal() {
 
 function submitRPS(choice) {
     if (!state.pendingRPS) return;
-    send({ type: 'rps_choice', choice: choice });
-    hideRPSModal();
+    const role = $('rps-modal').dataset.role || 'attacker';
+
+    if (IS_OFFLINE) {
+        offlineRPS[role] = choice;
+        hideRPSModal();
+        if (offlineRPS.attacker && offlineRPS.defender) {
+            // 双方都选了，发送
+            send({ type: 'rps_choice', choice: offlineRPS.attacker, role: 'attacker' });
+            send({ type: 'rps_choice', choice: offlineRPS.defender, role: 'defender' });
+            offlineRPS = {};
+        } else {
+            // 切换到另一方
+            const nextRole = offlineRPS.attacker ? 'defender' : 'attacker';
+            const label = nextRole === 'attacker' ? '人方攻击！选砍头方向' : '鬼方防御！选防守方向';
+            showRPSModal(label, nextRole);
+        }
+    } else {
+        send({ type: 'rps_choice', choice: choice });
+        hideRPSModal();
+    }
 }
 
 $$('.rps-btn').forEach(btn => {
@@ -967,7 +1027,7 @@ function switchControllingPlayer() {
     state.highlightedCells = [];
     state.actionConfirmed = false;
     // 强制启用所有按钮
-    ['btn-move', 'btn-skill-0', 'btn-skill-1', 'btn-skill-2'].forEach(id => {
+    ['btn-stay', 'btn-move', 'btn-skill-0', 'btn-skill-1', 'btn-skill-2'].forEach(id => {
         const btn = $(id);
         if (btn) { btn.classList.remove('active'); btn.disabled = false; }
     });

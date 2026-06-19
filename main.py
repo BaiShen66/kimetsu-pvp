@@ -84,7 +84,8 @@ async def _process_and_broadcast_turn(room):
                 st["type"] = "turn_result"
                 st["for_player"] = pidx
                 st["turn_log"] = turn_result["log"]
-                st["pending_rps"] = room.state.pending_rps and room.state.rps_player_id == pidx
+                st["pending_rps"] = room.state.pending_rps
+                st["rps_role"] = "attacker" if pidx == room.state.rps_human_pid else "defender" if room.state.pending_rps else None
                 if st["pending_rps"]:
                     st["rps_skill_name"] = room.state.rps_skill_name
                 await p.ws.send_text(json.dumps(st, ensure_ascii=False))
@@ -514,56 +515,48 @@ async def websocket_endpoint(ws: WebSocket, room_code: str, player_id: str):
                     }, ensure_ascii=False))
                     continue
 
-                # 猜拳玩家是人方
-                human_pid = room.state.rps_player_id
-                response = await room.handle_message(human_pid, message)
+                # 提交猜拳选择（双方都要选）
+                response = await room.handle_message(pid, message)
 
-                # 通知人方猜拳结果
-                human_player = room.state.players[human_pid]
-                if human_player.ws:
-                    try:
-                        response["type"] = "rps_result"
-                        await human_player.ws.send_text(json.dumps(response, ensure_ascii=False))
-                    except Exception:
-                        pass
-
-                # 平局：重新发猜拳请求
-                if response.get("retry"):
-                    if human_player.ws:
-                        try:
-                            st = room.state.get_state_for_player(human_pid)
-                            st["type"] = "turn_result"
-                            st["pending_rps"] = True
-                            st["rps_skill_name"] = room.state.rps_skill_name
-                            st["for_player"] = human_pid
-                            await human_player.ws.send_text(json.dumps(st, ensure_ascii=False))
-                        except Exception:
-                            pass
-                elif room.state.game_over:
-                    for pidx in [0, 1]:
-                        p = room.state.players[pidx]
-                        if p.ws:
-                            try:
-                                await p.ws.send_text(json.dumps({
-                                    "type": "game_over",
-                                    "winner": room.state.winner,
-                                    "winner_name": room.state.players[room.state.winner].name if room.state.winner is not None else "",
-                                    "message": f"{room.state.players[room.state.winner].name} 获胜！" if room.state.winner is not None else "平局！",
-                                    "battle_history": room.state.battle_history,
-                                }, ensure_ascii=False))
-                            except Exception:
-                                pass
+                if response.get("waiting"):
+                    # 等待另一方选择
+                    await ws.send_text(json.dumps({"type": "rps_waiting"}, ensure_ascii=False))
                 else:
+                    # 猜拳结算完成
                     for pidx in [0, 1]:
                         p = room.state.players[pidx]
                         if p.ws:
                             try:
-                                st = room.state.get_state_for_player(pidx)
-                                st["type"] = "rps_turn_end"
-                                st["for_player"] = pidx
-                                await p.ws.send_text(json.dumps(st, ensure_ascii=False))
+                                response["type"] = "rps_result"
+                                await p.ws.send_text(json.dumps(response, ensure_ascii=False))
                             except Exception:
                                 pass
+
+                    if room.state.game_over:
+                        for pidx in [0, 1]:
+                            p = room.state.players[pidx]
+                            if p.ws:
+                                try:
+                                    await p.ws.send_text(json.dumps({
+                                        "type": "game_over",
+                                        "winner": room.state.winner,
+                                        "winner_name": room.state.players[room.state.winner].name if room.state.winner is not None else "",
+                                        "message": f"{room.state.players[room.state.winner].name} 获胜！" if room.state.winner is not None else "平局！",
+                                        "battle_history": room.state.battle_history,
+                                    }, ensure_ascii=False))
+                                except Exception:
+                                    pass
+                    else:
+                        for pidx in [0, 1]:
+                            p = room.state.players[pidx]
+                            if p.ws:
+                                try:
+                                    st = room.state.get_state_for_player(pidx)
+                                    st["type"] = "rps_turn_end"
+                                    st["for_player"] = pidx
+                                    await p.ws.send_text(json.dumps(st, ensure_ascii=False))
+                                except Exception:
+                                    pass
 
             elif msg_type == "get_state":
                 if room is None:
