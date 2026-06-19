@@ -249,7 +249,8 @@ async def websocket_endpoint(ws: WebSocket, room_code: str, player_id: str):
 
                 # 确认鬼方技能
                 try:
-                    await room.handle_message(1, {"type": "select_skills", "skill_indices": [0, 1, 2]})
+                    result = await room.handle_message(1, {"type": "select_skills", "skill_indices": [0, 1, 2]})
+                    print(f"[DEBUG] create_single_player 鬼方技能确认: {result}, ready_count={room.ready_count}")
                 except Exception as e:
                     print(f"离线鬼方技能确认失败: {e}")
 
@@ -457,6 +458,12 @@ async def websocket_endpoint(ws: WebSocket, room_code: str, player_id: str):
                 await ws.send_text(json.dumps(response, ensure_ascii=False))
 
                 # 检查双方是否都准备好了（离线模式鬼方在create时已确认）
+                print(f"[DEBUG] select_skills ready_count={room.ready_count} all_ready={room.all_ready()} offline={getattr(room, 'offline_mode', False)}")
+                if not room.all_ready():
+                    await ws.send_text(json.dumps({
+                        "type": "error",
+                        "message": f"等待对手确认(ready={room.ready_count})"
+                    }, ensure_ascii=False))
                 if room.all_ready():
                     room.state.generate_map()
 
