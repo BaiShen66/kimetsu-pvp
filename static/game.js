@@ -159,7 +159,12 @@ function handleMessage(msg) {
         case 'game_state':
         case 'game_start':
             updateFullState(msg);
-            if (msg.type === 'game_start') addLog('⚔️ 战斗开始！');
+            if (msg.type === 'game_start') {
+                addLog('⚔️ 战斗开始！');
+                $('game-over-modal').classList.add('hidden');
+                state.gameOver = false;
+                resetActionUI();
+            }
             break;
 
         case 'turn_result':
@@ -182,6 +187,10 @@ function handleMessage(msg) {
 
         case 'rps_waiting':
             hideRPSModal();
+            break;
+
+        case 'rematch_waiting':
+            addLog('已发送再来一局请求，等待对手...');
             break;
 
         case 'rps_result':
@@ -809,6 +818,12 @@ function addLog(message) {
     while (log.children.length > 50) {
         log.removeChild(log.lastChild);
     }
+}
+
+function requestRematch() {
+    send({ type: 'rematch' });
+    $('btn-new-game').disabled = true;
+    $('btn-new-game').textContent = '等待对手...';
 }
 
 // ========== 游戏结束 ==========

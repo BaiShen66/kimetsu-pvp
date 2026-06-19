@@ -487,6 +487,33 @@ async def websocket_endpoint(ws: WebSocket, room_code: str, player_id: str):
                             except Exception:
                                 pass
 
+            elif msg_type == "rematch":
+                if room is None:
+                    await ws.send_text(json.dumps({"type": "error", "message": "未加入房间"}, ensure_ascii=False))
+                    continue
+
+                room.rematch_votes = getattr(room, 'rematch_votes', set())
+                room.rematch_votes.add(pid)
+                if len(room.rematch_votes) >= 2:
+                    room.rematch_votes = set()
+                    room.reset_game()
+                    # 自动确认鬼方技能（鬼方始终是pid=1）
+                    await room.handle_message(1, {"type": "select_skills", "skill_indices": [0, 1, 2]})
+                    # 发送新 game_start
+                    for pidx in [0, 1]:
+                        p = room.state.players[pidx]
+                        if p.ws:
+                            try:
+                                st = room.state.get_state_for_player(pidx)
+                                st["type"] = "game_start"
+                                st["player_id"] = pidx
+                                st["player_name"] = p.name
+                                await p.ws.send_text(json.dumps(st, ensure_ascii=False))
+                            except Exception:
+                                pass
+                else:
+                    await ws.send_text(json.dumps({"type": "rematch_waiting", "message": "等待对手确认..."}, ensure_ascii=False))
+
             elif msg_type == "get_state":
                 if room is None:
                     await ws.send_text(json.dumps({

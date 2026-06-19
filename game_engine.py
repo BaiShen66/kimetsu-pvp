@@ -726,6 +726,27 @@ class GameRoom:
         self.state.players[1].character = CHARACTER_AKAZA
         self.state.players[1].max_hp = CHARACTER_AKAZA.max_hp
 
+    def reset_game(self):
+        """重置游戏状态，保留角色和名字"""
+        self.state.map_grid = []
+        self.state.turn = 0
+        self.state.log = []
+        self.state.game_over = False
+        self.state.winner = None
+        self.state.pending_rps = False
+        self.state.battle_history = []
+        self.state.players[0].hp = self.state.players[0].max_hp
+        self.state.players[0].position = (0, 0)
+        self.state.players[0].stunned = False
+        self.state.players[0].selected_skills = []
+        self.state.players[1].hp = self.state.players[1].max_hp
+        self.state.players[1].position = (5, 11)
+        self.state.players[1].stunned = False
+        self.state.players[1].selected_skills = []
+        self.ready_count = 0
+        self.turn_actions = {}
+        self.state.generate_map()
+
     def is_player_connected(self, player_id: int) -> bool:
         return self.state.players[player_id].connected
 
