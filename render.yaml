@@ -5,3 +5,10 @@ services:
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /
+    envVars:
+      - key: GUIDE_API_KEY
+        sync: false
+      - key: GUIDE_API_URL
+        sync: false
+      - key: GUIDE_MODEL
+        sync: false

@@ -102,36 +102,8 @@
                     <button id="btn-guide-send" class="btn btn-sm btn-primary">发送</button>
                 </div>
                 <div class="guide-actions">
-                    <button id="btn-guide-settings" class="btn btn-sm">⚙️ 设置API</button>
                     <button id="btn-guide-clear" class="btn btn-sm">清除对话</button>
                 </div>
-            </div>
-        </div>
-
-        <!-- API 设置弹窗 -->
-        <div id="api-settings-modal" class="modal hidden">
-            <div class="modal-content" style="max-width:420px;">
-                <h3>⚙️ 向导 API 设置</h3>
-                <p style="font-size:12px;color:var(--text-dim);margin:8px 0;">
-                    需要 OpenAI 兼容 API。Key 仅存本地浏览器。
-                </p>
-                <div class="input-group">
-                    <label>API Key</label>
-                    <input type="password" id="api-key-input" placeholder="sk-...">
-                </div>
-                <div class="input-group">
-                    <label>接口地址（可选）</label>
-                    <input type="text" id="api-url-input" placeholder="https://api.openai.com/v1/chat/completions">
-                </div>
-                <div class="input-group">
-                    <label>模型名称</label>
-                    <input type="text" id="model-input" value="gpt-3.5-turbo">
-                </div>
-                <div style="display:flex;gap:8px;margin-top:12px;">
-                    <button id="btn-save-api" class="btn btn-primary" style="flex:1;">💾 保存</button>
-                    <button id="btn-cancel-api" class="btn btn-secondary" style="flex:1;">取消</button>
-                </div>
-                <p id="api-error" class="error-message hidden"></p>
             </div>
         </div>
 
@@ -597,39 +569,6 @@
             Guide.clearHistory();
             $('guide-messages').innerHTML = '';
             showGuideGreeting();
-        });
-
-        // API 设置
-        $('btn-guide-settings').addEventListener('click', () => {
-            const s = Guide.getSettings();
-            $('api-key-input').value = s.apiKey || '';
-            $('api-url-input').value = s.apiUrl || '';
-            $('model-input').value = s.model || 'gpt-3.5-turbo';
-            $('api-settings-modal').classList.remove('hidden');
-        });
-
-        $('btn-cancel-api').addEventListener('click', () => {
-            $('api-settings-modal').classList.add('hidden');
-        });
-
-        $('btn-save-api').addEventListener('click', () => {
-            const key = $('api-key-input').value.trim();
-            if (!key) {
-                $('api-error').textContent = '请输入 API Key';
-                $('api-error').classList.remove('hidden');
-                return;
-            }
-            Guide.saveSettings({
-                apiKey: key,
-                apiUrl: $('api-url-input').value.trim() || 'https://api.openai.com/v1/chat/completions',
-                model: $('model-input').value.trim() || 'gpt-3.5-turbo',
-            });
-            $('api-settings-modal').classList.add('hidden');
-            $('api-error').classList.add('hidden');
-        });
-
-        $('api-settings-modal').addEventListener('click', (e) => {
-            if (e.target === $('api-settings-modal')) $('api-settings-modal').classList.add('hidden');
         });
 
         // 初始显示问候

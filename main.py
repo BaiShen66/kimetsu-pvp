@@ -8,6 +8,7 @@ import asyncio
 import sys
 import io
 import time
+import httpx
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
@@ -68,6 +69,44 @@ async def index():
 async def game_page():
     """游戏页面"""
     return render_template("game.html")
+
+
+# ====== AI 向导代理 ======
+GUIDE_API_KEY = os.environ.get("GUIDE_API_KEY", "")
+GUIDE_API_URL = os.environ.get("GUIDE_API_URL", "https://api.openai.com/v1/chat/completions")
+GUIDE_MODEL = os.environ.get("GUIDE_MODEL", "gpt-3.5-turbo")
+
+
+@app.post("/api/guide")
+async def guide_proxy(request: Request):
+    """代理 AI 请求，API Key 存在服务端"""
+    if not GUIDE_API_KEY:
+        return {"error": "服务器未配置 GUIDE_API_KEY"}
+
+    body = await request.json()
+    messages = body.get("messages", [])
+
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.post(
+                GUIDE_API_URL,
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {GUIDE_API_KEY}",
+                },
+                json={
+                    "model": GUIDE_MODEL,
+                    "messages": messages,
+                    "max_tokens": 250,
+                    "temperature": 0.7,
+                },
+            )
+            data = resp.json()
+            if resp.status_code != 200:
+                return {"error": f"API错误({resp.status_code}): {data.get('error', {}).get('message', '未知')}"}
+            return {"reply": data.get("choices", [{}])[0].get("message", {}).get("content", "")}
+    except Exception as e:
+        return {"error": f"请求失败: {str(e)}"}
 
 
 @app.get("/api/rooms")
