@@ -57,9 +57,10 @@ class GameState:
         self.game_over: bool = False
         self.winner: Optional[int] = None
         self.pending_rps: bool = False  # 是否等待猜拳
-        self.rps_player_id: int = 0     # 需要猜拳的玩家
+        self.rps_human_pid: int = 0     # 人方（攻击方）
         self.rps_skill_name: str = ""   # 触发猜拳的技能名
-        self._rps_damage_pending: float = 0  # 猜拳中暂存的伤害值
+        self.rps_human_choice: str = ""  # 人方选择
+        self.rps_demon_choice: str = ""  # 鬼方选择
         self.battle_history: List[dict] = []  # 完整战斗记录
 
     def generate_map(self):
@@ -413,9 +414,10 @@ class GameState:
             if p.character and p.character.faction == "human":
                 # 人方攻击鬼方 → 触发猜拳
                 self.pending_rps = True
-                self.rps_player_id = pid
+                self.rps_human_pid = pid
                 self.rps_skill_name = skill_name
-                self._rps_damage_pending = skill_damage  # 暂存伤害值
+                self.rps_human_choice = ""
+                self.rps_demon_choice = ""
                 turn_log.append(f"⚔️ {p.name} 的 {skill_name} 命中！等待猜拳判定...")
             else:
                 # 鬼方攻击人方 → 直接造成伤害
@@ -490,56 +492,40 @@ class GameState:
             "game_over": self.game_over,
             "winner": self.winner,
             "pending_rps": self.pending_rps,
-            "rps_player_id": self.rps_player_id if self.pending_rps else None,
             "rps_skill_name": self.rps_skill_name if self.pending_rps else None,
         }
 
-    def resolve_rps(self, player_id: int, choice: str) -> Dict:
-        """
-        结算猜拳
-        choice: "rock", "scissors", "paper"
-        """
-        if not self.pending_rps or player_id != self.rps_player_id:
+    def submit_rps_choice(self, player_id: int, choice: str) -> dict:
+        """提交猜拳选择，等双方都选完再结算"""
+        if not self.pending_rps:
             return {"error": "当前没有待处理的猜拳"}
-
-        # 鬼方随机防御
-        demon_choice = random.choice(["rock", "scissors", "paper"])
-        human_choice = choice
-
-        # 判定胜负
-        # 石头赢剪刀，剪刀赢布，布赢石头
-        win_map = {"rock": "scissors", "scissors": "paper", "paper": "rock"}
-
-        if win_map[human_choice] == demon_choice:
-            result = "win"
-        elif human_choice == demon_choice:
-            result = "draw"
+        if choice not in ("rock", "scissors", "paper"):
+            return {"error": "无效选择"}
+        if player_id == self.rps_human_pid:
+            self.rps_human_choice = choice
         else:
-            result = "lose"
+            self.rps_demon_choice = choice
+        if self.rps_human_choice and self.rps_demon_choice:
+            return self._resolve_rps()
+        return {"waiting": True}
 
-        demon_pid = 1 - player_id
-
-        if result == "win":
-            # 砍头秒杀
+    def _resolve_rps(self) -> dict:
+        """双方都选了，砍头判定"""
+        hc, dc = self.rps_human_choice, self.rps_demon_choice
+        human_pid, demon_pid = self.rps_human_pid, 1 - self.rps_human_pid
+        win_map = {"rock": "scissors", "scissors": "paper", "paper": "rock"}
+        if win_map[hc] == dc:
             self.players[demon_pid].hp = 0
             self.game_over = True
-            self.winner = player_id
-            self.log.append(f"⚔️ 砍头斩杀！{self.players[demon_pid].name} 被击败！")
-        elif result == "draw":
-            self.log.append(f"✊ 平局，没砍下")
+            self.winner = human_pid
+            self.log.append("⚔️ 砍头斩杀！")
+        elif hc == dc:
+            self.log.append("✊ 平局，没砍下")
         else:
-            self.log.append(f"🛡️ 鬼防住了")
-
+            self.log.append("🛡️ 鬼防住了")
         self.pending_rps = False
-        self.rps_player_id = 0
-
-        return {
-            "result": result,
-            "human_choice": human_choice,
-            "demon_choice": demon_choice,
-            "game_over": self.game_over,
-            "winner": self.winner,
-        }
+        result = "win" if self.game_over else ("draw" if hc == dc else "lose")
+        return {"result": result, "human_choice": hc, "demon_choice": dc, "game_over": self.game_over, "winner": self.winner}
 
     def _calculate_demon_damage(self, base_damage: float) -> float:
         """计算鬼方实际伤害（浮动）"""
@@ -710,7 +696,7 @@ class GameRoom:
             choice = data.get("choice")
             if choice not in ("rock", "scissors", "paper"):
                 return {"type": "error", "message": "无效的猜拳选择"}
-            return self.state.resolve_rps(player_id, choice)
+            return self.state.submit_rps_choice(player_id, choice)
 
         return {"type": "error", "message": f"未知消息类型: {msg_type}"}
 

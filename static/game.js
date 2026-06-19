@@ -168,13 +168,20 @@ function handleMessage(msg) {
             state.actionConfirmed = false;
             resetActionUI();
 
-            if (msg.pending_rps) showRPSModal(msg.rps_skill_name);
+            if (msg.pending_rps) {
+                const label = msg.rps_role === 'attacker' ? '你发动攻击！选方向' : '鬼方防御！选防守';
+                showRPSModal(label);
+            }
 
             if (msg.game_over) {
                 state.gameOver = true;
                 saveBattleRecord(msg);
                 showGameOver(msg);
             }
+            break;
+
+        case 'rps_waiting':
+            hideRPSModal();
             break;
 
         case 'rps_result':
