@@ -105,6 +105,8 @@ class GameState:
 
     def get_movable_cells(self, player_id: int) -> List[Tuple[int, int]]:
         """获取某玩家当前可移动到的格子（8方向、1格）"""
+        if not self.map_grid or len(self.map_grid) == 0:
+            return []
         p = self.players[player_id]
         r, c = p.position
         cells = []
@@ -120,6 +122,8 @@ class GameState:
         计算技能覆盖的格子
         返回: (受影响的格子列表, 施法者新位置或None)
         """
+        if not self.map_grid or len(self.map_grid) == 0:
+            return [], None
         p = self.players[player_id]
         r, c = p.position
         cells = []
