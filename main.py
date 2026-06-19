@@ -499,6 +499,8 @@ async def websocket_endpoint(ws: WebSocket, room_code: str, player_id: str):
                 actions = message.get("actions", {})
                 for pid_str, action in actions.items():
                     pid_val = int(pid_str)
+                    # 补上 type 字段，handle_message 需要它
+                    action["type"] = "select_action"
                     await room.handle_message(pid_val, action)
 
                 if room.all_actions_received():
