@@ -605,7 +605,7 @@ class GameState:
             "enemy_stunned": other.stunned,
             "game_over": self.game_over,
             "winner": self.winner,
-            "pending_rps": self.pending_rps and self.rps_player_id == player_id,
+            "pending_rps": self.pending_rps,
             "battle_history": self.battle_history if self.game_over else [],
             "movable_cells": self.get_movable_cells(player_id),
         }
