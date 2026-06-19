@@ -171,6 +171,55 @@ input[type="text"]:focus {
     font-size: 14px;
 }
 
+/* ========== 玩家信息栏 ========== */
+.player-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 20px;
+    background: var(--bg-panel);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.player-bar-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.player-icon {
+    font-size: 20px;
+}
+
+.player-display-name {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.player-display-id {
+    font-size: 11px;
+    color: var(--text-dim);
+    font-family: "Courier New", monospace;
+    background: var(--bg-card);
+    padding: 2px 8px;
+    border-radius: 4px;
+}
+
+.player-bar-right {
+    display: flex;
+    gap: 8px;
+}
+
+@media (max-width: 768px) {
+    .player-bar {
+        padding: 6px 12px;
+    }
+    .player-display-id {
+        display: none;
+    }
+}
+
 /* ========== 大厅 ========== */
 .title-section {
     text-align: center;

@@ -7,6 +7,32 @@
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
+    <!-- 玩家信息栏 -->
+    <div id="player-bar" class="player-bar">
+        <div class="player-bar-left">
+            <span class="player-icon">🎮</span>
+            <span id="player-display-name" class="player-display-name"></span>
+            <span id="player-display-id" class="player-display-id"></span>
+        </div>
+        <div class="player-bar-right">
+            <button id="btn-edit-name" class="btn btn-sm">✏️ 改名</button>
+        </div>
+    </div>
+
+    <!-- 改名弹窗 -->
+    <div id="name-modal" class="modal hidden">
+        <div class="modal-content" style="max-width:360px;">
+            <h3>修改显示名称</h3>
+            <p style="font-size:12px;color:var(--text-dim);margin:8px 0;">ID 不可修改，名称可随时更改</p>
+            <input type="text" id="new-player-name" maxlength="12" placeholder="输入新名称" style="margin-bottom:12px;">
+            <div style="display:flex;gap:8px;">
+                <button id="btn-save-name" class="btn btn-primary" style="flex:1;">💾 保存</button>
+                <button id="btn-cancel-name" class="btn btn-secondary" style="flex:1;">取消</button>
+            </div>
+            <p id="name-error" class="error-message hidden"></p>
+        </div>
+    </div>
+
     <div id="app">
         <!-- 阶段1: 大厅 - 创建/加入房间 -->
         <div id="lobby-phase" class="phase active">
@@ -87,12 +113,60 @@
         </div>
     </div>
 
+    <script src="/static/player.js"></script>
     <script>
+        // ========== 玩家系统 ==========
+        function updatePlayerBar() {
+            $('player-display-name').textContent = Player.getName();
+            $('player-display-id').textContent = '#' + Player.getId();
+            $('player-name').value = Player.getName();
+        }
+
+        // 改名弹窗
+        $('btn-edit-name').addEventListener('click', () => {
+            $('new-player-name').value = Player.getName();
+            $('name-modal').classList.remove('hidden');
+            $('name-error').classList.add('hidden');
+        });
+
+        $('btn-cancel-name').addEventListener('click', () => {
+            $('name-modal').classList.add('hidden');
+        });
+
+        $('btn-save-name').addEventListener('click', () => {
+            const newName = $('new-player-name').value.trim();
+            if (!newName) {
+                $('name-error').textContent = '名称不能为空';
+                $('name-error').classList.remove('hidden');
+                return;
+            }
+            if (newName.length > 12) {
+                $('name-error').textContent = '名称不能超过12个字符';
+                $('name-error').classList.remove('hidden');
+                return;
+            }
+            Player.setName(newName);
+            $('name-modal').classList.add('hidden');
+            updatePlayerBar();
+        });
+
+        // Enter 保存
+        $('new-player-name').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') $('btn-save-name').click();
+        });
+
+        // 点击弹窗外部关闭
+        $('name-modal').addEventListener('click', (e) => {
+            if (e.target === $('name-modal')) $('name-modal').classList.add('hidden');
+        });
+
+        updatePlayerBar();
+
         // ========== 全局状态 ==========
         let ws = null;
         let roomCode = null;
         let playerId = null;
-        let playerName = '';
+        let playerName = Player.getName();
         let characterData = null;
 
         // ========== DOM 元素 ==========

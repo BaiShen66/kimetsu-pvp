@@ -878,5 +878,10 @@ document.addEventListener('keydown', (e) => {
 console.log('⚔️ 极限格斗 PVP 鬼灭之刀 - 游戏客户端已就绪');
 $('room-display').textContent = `房间：${ROOM_CODE}`;
 
+// 显示玩家信息
+if (window.Player) {
+    $('player-name-display').textContent = `🎮 ${Player.getName()}`;
+}
+
 // 连接 WebSocket
 connect();
