@@ -27,8 +27,6 @@ const state = {
     yourStunned: false,
     enemyStunned: false,
     turn: 0,
-    hazumiActive: false,     // 破绽之线是否激活
-    hazumiUsedThisTurn: false,
     selectedAction: null,      // 'move' | 'skill'
     selectedSkillIndex: 0,
     selectedDirection: null,
@@ -174,18 +172,6 @@ function handleMessage(msg) {
             if (msg.turn_log) msg.turn_log.forEach(log => addLog(log));
             state.actionConfirmed = false;
             resetActionUI();
-
-            if (state.hazumiUsedThisTurn && msg.your_character?.passive_name === '破绽之线') {
-                state.hazumiUsedThisTurn = false;
-                state.hazumiActive = false;
-                $('btn-hazumi').classList.remove('active');
-                $('btn-hazumi').disabled = true;
-                $('btn-hazumi').textContent = '已用';
-                // 显示方向选择器让玩家改方向
-                $('direction-picker').classList.remove('hidden');
-                addLog('🔮 破绽之线：请选择新的方向');
-                state._hazumiRedirect = true;
-            }
 
             if (msg.pending_rps) {
                 const label = msg.rps_role === 'attacker' ? '你发动攻击！选方向' : '鬼方防御！选防守';
@@ -525,17 +511,6 @@ function updateConfirmButton() {
 }
 
 // ========== 行动选择 ==========
-$('btn-hazumi').addEventListener('click', () => {
-    if (state.hazumiActive) {
-        state.hazumiActive = false;
-        $('btn-hazumi').classList.remove('active');
-    } else {
-        state.hazumiActive = true;
-        state.hazumiUsedThisTurn = true;
-        $('btn-hazumi').classList.add('active');
-    }
-});
-
 $('btn-move').addEventListener('click', () => {
     if (state.actionConfirmed || state.yourStunned) return;
 
@@ -706,14 +681,6 @@ $$('.dir-btn').forEach(btn => {
         const dir = btn.dataset.dir;
         if (!dir) return;
 
-        if (state._hazumiRedirect) {
-            state._hazumiRedirect = false;
-            $('direction-picker').classList.add('hidden');
-            send({ type: 'hazumi_use', direction: dir });
-            addLog(`🔮 破绽之线：方向改为 ${dir}`);
-            return;
-        }
-
         state.selectedDirection = dir;
         updateDirectionPicker(dir);
         updateConfirmButton();
@@ -745,7 +712,6 @@ $('btn-confirm-action').addEventListener('click', () => {
     }
 
     action.type = 'select_action';
-    if (state.hazumiActive) action.hazumi = true;
     send(action);
 
     state.actionConfirmed = true;

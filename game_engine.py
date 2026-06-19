@@ -39,7 +39,6 @@ class PlayerState:
     position: Tuple[int, int] = (0, 0)
     stunned: bool = False       # 是否晕眩
     connected: bool = False
-    passive_used: bool = False  # 被动技能是否已用
     last_action: Optional[dict] = None  # 本回合的行动
     ws = None
 
@@ -566,8 +565,6 @@ class GameState:
                 "name": p.character.name if p.character else "",
                 "faction": p.character.faction if p.character else "",
                 "emoji": p.character.emoji if p.character else "",
-                "passive_name": p.character.passive_name if p.character else "",
-                "passive_desc": p.character.passive_desc if p.character else "",
             } if p.character else None,
             "enemy_character": {
                 "name": other.character.name if other.character else "",
@@ -742,12 +739,10 @@ class GameRoom:
         self.state.players[0].position = (0, 0)
         self.state.players[0].stunned = False
         self.state.players[0].selected_skills = []
-        self.state.players[0].passive_used = False
         self.state.players[1].hp = self.state.players[1].max_hp
         self.state.players[1].position = (5, 11)
         self.state.players[1].stunned = False
         self.state.players[1].selected_skills = []
-        self.state.players[1].passive_used = False
         self.ready_count = 0
         self.turn_actions = {}
         self.state.generate_map()

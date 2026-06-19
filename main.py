@@ -18,7 +18,6 @@ from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
 
 from game_engine import GameRoom, generate_room_code
-from characters import DIRECTIONS
 
 # 修复 Windows GBK 编码问题
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
@@ -485,61 +484,6 @@ async def websocket_endpoint(ws: WebSocket, room_code: str, player_id: str):
                                 st["type"] = "rps_turn_end"
                                 st["for_player"] = pidx
                                 await p.ws.send_text(json.dumps(st, ensure_ascii=False))
-                            except Exception:
-                                pass
-
-            elif msg_type == "hazumi_use":
-                # 破绽之线：修改技能方向重新结算
-                if room is None or room.state.game_over:
-                    continue
-                p = room.state.players[pid]
-                if p.passive_used or not p.character or p.character.passive_name != "破绽之线":
-                    await ws.send_text(json.dumps({"type": "error", "message": "无法使用破绽之线"}, ensure_ascii=False))
-                    continue
-
-                new_direction = message.get("direction", "")
-                if new_direction not in DIRECTIONS:
-                    continue
-
-                # 修改本回合行动的方向
-                action = room.turn_actions.get(pid, {})
-                if action.get("action") in ("move", "skill"):
-                    action["direction"] = new_direction
-                p.passive_used = True
-
-                # 重新结算
-                turn_result = room.state.resolve_turn(room.turn_actions)
-                room.state.end_turn_cleanup()
-                room.turn_actions = {}
-
-                # 广播新结果
-                for pidx in [0, 1]:
-                    pl = room.state.players[pidx]
-                    if pl.ws:
-                        try:
-                            st = room.state.get_state_for_player(pidx)
-                            st["type"] = "turn_result"
-                            st["for_player"] = pidx
-                            st["turn_log"] = turn_result["log"]
-                            st["pending_rps"] = room.state.pending_rps and room.state.rps_human_pid == pidx
-                            if st["pending_rps"]:
-                                st["rps_skill_name"] = room.state.rps_skill_name
-                            await pl.ws.send_text(json.dumps(st, ensure_ascii=False))
-                        except Exception:
-                            pass
-
-                if room.state.game_over:
-                    for pidx in [0, 1]:
-                        pl = room.state.players[pidx]
-                        if pl.ws:
-                            try:
-                                await pl.ws.send_text(json.dumps({
-                                    "type": "game_over",
-                                    "winner": room.state.winner,
-                                    "winner_name": room.state.players[room.state.winner].name if room.state.winner is not None else "",
-                                    "message": f"{room.state.players[room.state.winner].name} 获胜！" if room.state.winner is not None else "平局！",
-                                    "battle_history": room.state.battle_history,
-                                }, ensure_ascii=False))
                             except Exception:
                                 pass
 
