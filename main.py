@@ -77,12 +77,14 @@ async def websocket_endpoint(ws: WebSocket, room_code: str, player_id: str):
     # 转换 player_id
     pid = int(player_id) if player_id.isdigit() else 0
 
-    # 如果是已知房间，查找并更新 WebSocket 引用
+    # 如果是已知房间，更新 WebSocket 引用；只在重连时标记 connected
     room = rooms.get(room_code)
     if room and pid in (0, 1):
         room.state.players[pid].ws = ws
-        room.state.players[pid].connected = True
-        print(f"玩家 {pid} 重新连接到房间 {room_code}")
+        # 只有已注册过的玩家才自动标记为连接（重连场景）
+        if room.state.players[pid].name:
+            room.state.players[pid].connected = True
+            print(f"玩家 {pid} 重新连接到房间 {room_code}")
 
     try:
         while True:
