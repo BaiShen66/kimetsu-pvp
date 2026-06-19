@@ -180,6 +180,11 @@ function handleMessage(msg) {
             }
             break;
 
+        case 'rps_waiting':
+            // 已提交，等待对方
+            hideRPSModal();
+            break;
+
         case 'rps_result':
             addLog(`✊ ${getRPSName(msg.human_choice)} vs ${getRPSName(msg.demon_choice)} — ${msg.result === 'win' ? '⚔️ 砍头斩杀！' : msg.result === 'draw' ? '平局，没砍下' : '鬼防住了'}`);
             hideRPSModal();
