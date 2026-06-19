@@ -158,29 +158,19 @@ function handleMessage(msg) {
     switch (msg.type) {
         case 'game_state':
         case 'game_start':
+            updateFullState(msg);
             if (IS_OFFLINE && msg.for_player !== undefined) {
                 state.bothStates = state.bothStates || {};
                 state.bothStates[msg.for_player] = msg;
-                console.log('离线状态存入 pid=' + msg.for_player, 'HP=' + msg.your_hp, 'Skills=' + (msg.your_skills||[]).length);
-                updateFullState(msg);
-
-                if (state.bothStates[0] && state.bothStates[1] && !state._initialized) {
-                    state._initialized = true;
-                    state.controllingPlayer = 0;
-                    updateFullState(state.bothStates[0]);
-                    // 强制启用按钮
-                    ['btn-stay', 'btn-move', 'btn-skill-0', 'btn-skill-1', 'btn-skill-2'].forEach(id => {
-                        const b = $(id); if (b) b.disabled = false;
-                    });
-                    updateSkillButtons();
-                    renderMap();
-                    updateConfirmButton();
-                    const name = state.yourCharacter?.name || '?';
-                    $('controlling-label').textContent = '当前操控: ' + name;
-                    console.log('离线模式就绪, 操控=' + name, '按键已启用');
-                }
-            } else {
-                updateFullState(msg);
+            }
+            if (IS_OFFLINE && state.bothStates[0] && state.bothStates[1]) {
+                // 双方状态都到了，保证UI可用
+                ['btn-stay','btn-move','btn-skill-0','btn-skill-1','btn-skill-2'].forEach(id => {
+                    const b = $(id); if (b) b.disabled = false;
+                });
+                const name = state.yourCharacter?.name || '?';
+                $('controlling-label').textContent = '当前操控: ' + name;
+                $('controlling-panel').classList.remove('hidden');
             }
             if (msg.type === 'game_start') addLog('⚔️ 战斗开始！');
             break;
