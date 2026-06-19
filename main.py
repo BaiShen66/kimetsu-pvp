@@ -72,15 +72,14 @@ async def game_page():
 
 @app.get("/api/rooms")
 async def list_rooms():
-    """返回所有活跃房间列表"""
+    """返回所有活跃房间列表（空房间保留10分钟）"""
     result = []
     for code, room in rooms.items():
         if room.state.game_over:
             continue
-        connected = sum(1 for p in room.state.players if p.connected)
-        if connected == 0:
+        if room.is_expired():
             continue
-
+        connected = sum(1 for p in room.state.players if p.connected)
         max_players = len(room.state.players)
         in_game = room.ready_count >= 2
 
@@ -91,6 +90,7 @@ async def list_rooms():
             "max_players": max_players,
             "in_game": in_game,
             "created_seconds_ago": int(time.time() - room.created_at),
+            "empty_seconds": int(time.time() - room.empty_since) if room.empty_since else 0,
         })
     return {"rooms": result}
 

@@ -319,6 +319,13 @@ input[type="text"]:focus {
     opacity: 0.7;
 }
 
+/* 空房间（全部断开） */
+.room-item.status-empty {
+    border-color: rgba(255, 68, 68, 0.2);
+    opacity: 0.5;
+    border-style: dashed;
+}
+
 /* 对战中 - 灰色 */
 .room-item.status-ingame {
     border-color: var(--border-color);
@@ -383,6 +390,17 @@ input[type="text"]:focus {
 .room-count-badge.ingame {
     background: rgba(255, 68, 68, 0.1);
     color: var(--enemy-red);
+}
+
+/* 0/2 全部离线 */
+.room-count-badge.empty {
+    background: rgba(255, 68, 68, 0.08);
+    color: #cc6666;
+}
+
+.room-empty-tip {
+    font-size: 10px;
+    color: #996666;
 }
 
 .btn-sm {

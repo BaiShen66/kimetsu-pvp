@@ -352,22 +352,25 @@
                 } else {
                     list.innerHTML = data.rooms.map(r => {
                         const canJoin = r.players < r.max_players && !r.in_game;
+                        const empty = r.players === 0;
                         const full = r.players >= r.max_players || r.in_game;
-                        const rowCls = full ? (r.in_game ? 'status-ingame' : 'status-full') : 'status-waiting';
+                        const rowCls = empty ? 'status-empty' : (full ? (r.in_game ? 'status-ingame' : 'status-full') : 'status-waiting');
                         const badgeText = r.in_game ? '对战中' : `${r.players}/${r.max_players}`;
-                        const badgeCls = r.in_game ? 'ingame' : (full ? 'full' : 'waiting');
+                        const badgeCls = empty ? 'empty' : (r.in_game ? 'ingame' : (full ? 'full' : 'waiting'));
+                        const extraInfo = empty ? `<span class="room-empty-tip">断开·${Math.floor(r.empty_seconds / 60)}分钟后清理</span>` : '';
                         return `
                         <div class="room-item ${rowCls}">
                             <div class="room-item-left">
                                 <span class="room-item-code">${r.room_code}</span>
                                 <span class="room-item-host">👤 ${r.host_name}</span>
                                 <span class="room-item-time">${r.created_seconds_ago}秒前</span>
+                                ${extraInfo}
                             </div>
                             <div class="room-item-right">
                                 <span class="room-count-badge ${badgeCls}">${badgeText}</span>
                                 ${canJoin
                                     ? `<button class="btn btn-sm btn-secondary join-room-btn" data-code="${r.room_code}">🚪 加入</button>`
-                                    : `<button class="btn btn-sm" disabled>${r.in_game ? '🔒' : '已满'}</button>`
+                                    : `<button class="btn btn-sm" disabled>${r.in_game ? '🔒' : (empty ? '离线' : '已满')}</button>`
                                 }
                             </div>
                         </div>

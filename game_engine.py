@@ -591,10 +591,18 @@ class GameRoom:
         self.turn_actions: Dict[int, dict] = {}  # 当前回合的行动缓存
         self.created_at = time.time()
         self.last_activity = time.time()
+        self.empty_since: float = None  # 房间变空的时间（所有玩家离开时记录）
 
     def is_expired(self) -> bool:
-        """检查房间是否过期（15分钟无活动）"""
-        return time.time() - self.last_activity > 900
+        """检查房间是否过期（15分钟无活动，或空房间超过10分钟）"""
+        now = time.time()
+        if self.empty_since is not None:
+            return now - self.empty_since > 600  # 空房间保留10分钟
+        return now - self.last_activity > 900
+
+    def all_disconnected(self) -> bool:
+        """所有玩家是否都断开了"""
+        return all(not p.connected for p in self.state.players)
 
     async def handle_message(self, player_id: int, data: dict) -> dict:
         """处理玩家消息，返回响应"""
@@ -708,6 +716,11 @@ class GameRoom:
 
     def set_player_disconnected(self, player_id: int):
         self.state.players[player_id].connected = False
+        # 如果所有玩家都断开了，记录时间，保留房间10分钟
+        if self.all_disconnected() and self.empty_since is None:
+            self.empty_since = time.time()
+            print(f"房间 {self.room_code} 所有玩家离开，将保留10分钟")
 
     def set_player_connected(self, player_id: int):
         self.state.players[player_id].connected = True
+        self.empty_since = None  # 有人回来了，重置计时
