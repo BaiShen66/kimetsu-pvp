@@ -165,7 +165,7 @@ function handleMessage(msg) {
             }
             if (IS_OFFLINE && state.bothStates[0] && state.bothStates[1]) {
                 // 双方状态都到了，保证UI可用
-                ['btn-stay','btn-move','btn-skill-0','btn-skill-1','btn-skill-2'].forEach(id => {
+                ['btn-move','btn-skill-0','btn-skill-1','btn-skill-2'].forEach(id => {
                     const b = $(id); if (b) b.disabled = false;
                 });
                 const name = state.yourCharacter?.name || '?';
