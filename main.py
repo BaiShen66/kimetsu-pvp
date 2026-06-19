@@ -301,23 +301,24 @@ async def websocket_endpoint(ws: WebSocket, room_code: str, player_id: str):
 
     except WebSocketDisconnect:
         if room:
-            actual_pid = pid
-            room.set_player_disconnected(actual_pid)
-            other_pid = 1 - actual_pid
-            other_p = room.state.players[other_pid]
-            if other_p.ws:
-                try:
-                    await other_p.ws.send_text(json.dumps({
-                        "type": "player_disconnected",
-                        "message": "对手已断线，请等待..."
-                    }, ensure_ascii=False))
-                except Exception:
-                    pass
+            # 只有断开的是该玩家当前活跃连接时才标记离线
+            # 避免 lobby WS 断开时误伤已重连的 game WS
+            if room.state.players[pid].ws == ws:
+                room.set_player_disconnected(pid)
+                other_pid = 1 - pid
+                other_p = room.state.players[other_pid]
+                if other_p.ws:
+                    try:
+                        await other_p.ws.send_text(json.dumps({
+                            "type": "player_disconnected",
+                            "message": "对手已断线，请等待..."
+                        }, ensure_ascii=False))
+                    except Exception:
+                        pass
     except Exception as e:
         print(f"WebSocket 错误: {e}")
-        if room:
-            actual_pid = pid
-            room.set_player_disconnected(actual_pid)
+        if room and room.state.players[pid].ws == ws:
+            room.set_player_disconnected(pid)
 
 
 # 定期清理过期房间
