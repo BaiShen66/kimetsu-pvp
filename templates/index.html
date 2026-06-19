@@ -48,7 +48,7 @@
                         <span id="display-name" class="player-card-name"></span>
                         <span id="display-id" class="player-card-id"></span>
                     </div>
-                    <button id="btn-edit-name" class="btn btn-sm">✏️</button>
+                    <button id="btn-edit-name-card" class="btn btn-sm">✏️</button>
                 </div>
 
                 <div class="lobby-buttons">
@@ -119,6 +119,9 @@
 
     <script src="/static/player.js"></script>
     <script>
+        // 工具函数 — 必须最先定义
+        const $ = (id) => document.getElementById(id);
+
         // ========== 玩家系统 ==========
         function updatePlayerUI() {
             const name = Player.getName();
@@ -143,9 +146,10 @@
         }
 
         // 两个改名按钮绑定同一个弹窗
-        $('btn-edit-name').addEventListener('click', openNameModal);
-        const topEditBtn = document.querySelector('#player-bar #btn-edit-name');
-        if (topEditBtn) topEditBtn.addEventListener('click', openNameModal);
+        const editBtn1 = $('btn-edit-name');
+        const editBtn2 = $('btn-edit-name-card');
+        if (editBtn1) editBtn1.addEventListener('click', openNameModal);
+        if (editBtn2) editBtn2.addEventListener('click', openNameModal);
 
         $('btn-cancel-name').addEventListener('click', () => {
             $('name-modal').classList.add('hidden');
@@ -190,8 +194,6 @@
         }
 
         // ========== DOM 元素 ==========
-        const $ = (id) => document.getElementById(id);
-
         // ========== 阶段切换 ==========
         function showPhase(phaseName) {
             document.querySelectorAll('.phase').forEach(el => el.classList.remove('active'));
