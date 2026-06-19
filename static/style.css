@@ -264,6 +264,94 @@ input[type="text"]:focus {
     font-family: "Courier New", monospace;
 }
 
+/* ========== 房间大厅 ========== */
+.room-lobby {
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border-color);
+}
+
+.lobby-title {
+    font-size: 16px;
+    color: var(--text-secondary);
+    margin-bottom: 12px;
+    text-align: center;
+}
+
+.room-list {
+    max-height: 200px;
+    overflow-y: auto;
+    margin-bottom: 10px;
+}
+
+.room-empty {
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 13px;
+    padding: 16px;
+}
+
+.room-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    margin-bottom: 6px;
+    transition: border-color 0.2s;
+}
+
+.room-item:hover {
+    border-color: var(--self-blue);
+}
+
+.room-item-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.room-item-code {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 4px;
+    color: var(--accent-gold);
+    font-family: "Courier New", monospace;
+}
+
+.room-item-host {
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.room-item-time {
+    font-size: 11px;
+    color: var(--text-dim);
+}
+
+.btn-sm {
+    padding: 8px 16px;
+    font-size: 13px;
+}
+
+#btn-refresh-rooms {
+    width: 100%;
+    padding: 8px;
+    font-size: 13px;
+    background: transparent;
+    border: 1px dashed var(--border-color);
+    color: var(--text-dim);
+    cursor: pointer;
+    border-radius: 8px;
+}
+
+#btn-refresh-rooms:hover {
+    border-color: var(--self-blue);
+    color: var(--self-blue);
+}
+
 /* ========== 技能选择 ========== */
 .skill-selection {
     width: 100%;
@@ -885,6 +973,29 @@ input[type="text"]:focus {
 
 .rps-icon {
     font-size: 48px;
+}
+
+/* ========== 断线重连弹窗 ========== */
+.reconnect-content {
+    text-align: center;
+}
+.reconnect-content h2 {
+    color: var(--accent-gold);
+    margin-bottom: 16px;
+}
+.reconnect-info {
+    color: var(--text-primary);
+    font-size: 16px;
+    margin: 12px 0;
+}
+.reconnect-info span {
+    color: var(--accent-gold);
+    font-size: 24px;
+    font-weight: 700;
+}
+.reconnect-sub {
+    color: var(--text-dim);
+    font-size: 13px;
 }
 
 /* ========== 游戏结束弹窗 ========== */

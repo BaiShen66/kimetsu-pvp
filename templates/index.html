@@ -45,6 +45,15 @@
                     <div class="loading-spinner"></div>
                 </div>
 
+                <!-- 房间大厅 -->
+                <div id="room-lobby" class="room-lobby">
+                    <h3 class="lobby-title">🏠 可加入的房间</h3>
+                    <div id="room-list" class="room-list">
+                        <p class="room-empty">加载中...</p>
+                    </div>
+                    <button id="btn-refresh-rooms" class="btn btn-sm">🔄 刷新</button>
+                </div>
+
                 <div id="lobby-error" class="error-message hidden"></div>
             </div>
         </div>
@@ -330,6 +339,49 @@
                 });
             }
         });
+
+        // ========== 房间大厅 ==========
+        async function refreshRoomList() {
+            const list = $('room-list');
+            if (!list) return;
+            try {
+                const resp = await fetch('/api/rooms');
+                const data = await resp.json();
+                if (data.rooms.length === 0) {
+                    list.innerHTML = '<p class="room-empty">暂无可用房间，创建一个吧！</p>';
+                } else {
+                    list.innerHTML = data.rooms.map(r => `
+                        <div class="room-item">
+                            <div class="room-item-info">
+                                <span class="room-item-code">${r.room_code}</span>
+                                <span class="room-item-host">👤 ${r.host_name}</span>
+                                <span class="room-item-time">${r.created_seconds_ago}秒前</span>
+                            </div>
+                            <button class="btn btn-sm btn-secondary join-room-btn" data-code="${r.room_code}">
+                                🚪 加入
+                            </button>
+                        </div>
+                    `).join('');
+
+                    // 绑定加入按钮
+                    list.querySelectorAll('.join-room-btn').forEach(btn => {
+                        btn.addEventListener('click', () => {
+                            const code = btn.dataset.code;
+                            $('room-code-input').value = code;
+                            $('btn-join').click();
+                        });
+                    });
+                }
+            } catch (e) {
+                list.innerHTML = '<p class="room-empty">加载失败</p>';
+            }
+        }
+
+        $('btn-refresh-rooms').addEventListener('click', refreshRoomList);
+
+        // 初始加载 + 每5秒自动刷新
+        refreshRoomList();
+        setInterval(refreshRoomList, 5000);
 
         // ========== 初始化 ==========
         console.log('⚔️ 极限格斗 PVP 鬼灭之刀 - 大厅已就绪');

@@ -142,6 +142,23 @@
             </div>
         </div>
 
+        <!-- 断线重连遮罩 -->
+        <div id="reconnect-overlay" class="modal hidden">
+            <div class="modal-content reconnect-content">
+                <h2>🔌 连接已断开</h2>
+                <div id="reconnect-auto">
+                    <div class="loading-spinner"></div>
+                    <p class="reconnect-info"><span id="reconnect-countdown">5</span> 秒后自动重连</p>
+                    <p class="reconnect-sub" id="reconnect-attempt"></p>
+                </div>
+                <div id="reconnect-manual" class="hidden">
+                    <p>自动重连失败</p>
+                    <button class="btn btn-primary" onclick="manualReconnect()">🔄 手动重连</button>
+                    <button class="btn btn-secondary" onclick="location.reload()" style="margin-top:8px;">🔁 刷新页面</button>
+                </div>
+            </div>
+        </div>
+
         <!-- 游戏结束弹窗 -->
         <div id="game-over-modal" class="modal hidden">
             <div class="modal-content game-over-content">

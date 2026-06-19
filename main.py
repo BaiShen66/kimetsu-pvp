@@ -7,6 +7,7 @@ import json
 import asyncio
 import sys
 import io
+import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
@@ -67,6 +68,20 @@ async def index():
 async def game_page():
     """游戏页面"""
     return render_template("game.html")
+
+
+@app.get("/api/rooms")
+async def list_rooms():
+    """返回可加入的房间列表"""
+    available = []
+    for code, room in rooms.items():
+        if not room.state.game_over and room.state.players[0].connected and not room.state.players[1].connected:
+            available.append({
+                "room_code": code,
+                "host_name": room.state.players[0].name,
+                "created_seconds_ago": int(time.time() - room.created_at),
+            })
+    return {"rooms": available}
 
 
 @app.websocket("/ws/{room_code}/{player_id}")

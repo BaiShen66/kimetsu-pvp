@@ -38,6 +38,11 @@ const state = {
     rpsSeconds: 5,
 };
 
+// ========== 重连状态 ==========
+let reconnectAttempts = 0;
+const MAX_RECONNECT = 10;
+const RECONNECT_DELAYS = [1, 2, 3, 5, 8, 10, 15, 20, 30, 30]; // 秒
+
 // ========== WebSocket 连接 ==========
 function connect() {
     const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -46,7 +51,18 @@ function connect() {
 
     state.ws.onopen = () => {
         console.log('WebSocket 已连接');
-        // 请求当前游戏状态（用于断线重连或直接进入）
+        // 隐藏重连提示
+        hideReconnectOverlay();
+        reconnectAttempts = 0;
+
+        if (state.gameOver) return;
+
+        // 如果是重连，显示提示
+        if (reconnectAttempts === 0 && state.turn > 0) {
+            // 这不是重连，是首次连接
+        }
+
+        // 请求当前游戏状态
         send({ type: 'get_state' });
     };
 
@@ -57,14 +73,76 @@ function connect() {
 
     state.ws.onclose = () => {
         console.log('WebSocket 已断开');
-        if (!state.gameOver) {
-            addLog('⚠️ 连接已断开，请刷新页面');
+        if (!state.gameOver && reconnectAttempts < MAX_RECONNECT) {
+            attemptReconnect();
+        } else if (!state.gameOver) {
+            addLog('⚠️ 连接已断开，重连次数已用完，请刷新页面');
+            showReconnectOverlay(false);
         }
     };
 
     state.ws.onerror = (err) => {
         console.error('WebSocket 错误:', err);
+        // onclose 会在 onerror 之后自动触发，重连逻辑在 onclose 中处理
     };
+}
+
+function attemptReconnect() {
+    const delay = RECONNECT_DELAYS[Math.min(reconnectAttempts, RECONNECT_DELAYS.length - 1)];
+    reconnectAttempts++;
+    showReconnectOverlay(true, delay, reconnectAttempts);
+
+    console.log(`重连中... 第 ${reconnectAttempts} 次，${delay}秒后`);
+
+    setTimeout(() => {
+        if (state.ws && state.ws.readyState === WebSocket.CLOSED) {
+            connect();
+        }
+    }, delay * 1000);
+}
+
+function showReconnectOverlay(showCountdown, delaySeconds, attempt) {
+    const overlay = $('reconnect-overlay');
+    if (!overlay) return;
+
+    if (showCountdown && delaySeconds) {
+        overlay.classList.remove('hidden');
+        $('reconnect-countdown').textContent = delaySeconds;
+        $('reconnect-attempt').textContent = `第 ${attempt} 次重连`;
+        $('reconnect-auto').classList.remove('hidden');
+        $('reconnect-manual').classList.add('hidden');
+
+        // 倒计时
+        let remaining = delaySeconds;
+        if (state._reconnectInterval) clearInterval(state._reconnectInterval);
+        state._reconnectInterval = setInterval(() => {
+            remaining--;
+            if (remaining <= 0) {
+                clearInterval(state._reconnectInterval);
+            } else {
+                $('reconnect-countdown').textContent = remaining;
+            }
+        }, 1000);
+    } else {
+        overlay.classList.remove('hidden');
+        $('reconnect-auto').classList.add('hidden');
+        $('reconnect-manual').classList.remove('hidden');
+    }
+}
+
+function hideReconnectOverlay() {
+    const overlay = $('reconnect-overlay');
+    if (overlay) overlay.classList.add('hidden');
+    if (state._reconnectInterval) {
+        clearInterval(state._reconnectInterval);
+        state._reconnectInterval = null;
+    }
+}
+
+// 手动重连按钮
+function manualReconnect() {
+    reconnectAttempts = 0;
+    connect();
 }
 
 function send(msg) {
