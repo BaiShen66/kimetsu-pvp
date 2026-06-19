@@ -213,23 +213,29 @@ async def websocket_endpoint(ws: WebSocket, room_code: str, player_id: str):
                 room.ai_difficulty = difficulty
 
                 # AI 自动选全部技能
-                room.state.players[1].selected_skills = list(room.state.players[1].character.skills)
-                room.state.players[1].hp = room.state.players[1].max_hp
-                room.state.players[1].position = (5, 11)
-                room.ready_count = 1  # 玩家侧稍后确认
+                try:
+                    room.state.players[1].selected_skills = list(room.state.players[1].character.skills)
+                    room.state.players[1].hp = room.state.players[1].max_hp
+                    room.state.players[1].position = (5, 11)
+                    room.ready_count = 1  # 玩家侧稍后确认
 
-                # 初始化 AI 对手
-                room.ai_opponent = AIOpponent(
-                    difficulty=difficulty,
-                    api_key=GUIDE_API_KEY,
-                    api_url=GUIDE_API_URL,
-                    model=GUIDE_MODEL,
-                )
+                    # 初始化 AI 对手
+                    room.ai_opponent = AIOpponent(
+                        difficulty=difficulty,
+                        api_key=GUIDE_API_KEY,
+                        api_url=GUIDE_API_URL,
+                        model=GUIDE_MODEL,
+                    )
 
-                # AI 确认技能选择
-                await room.handle_message(1, {"type": "select_skills", "skill_indices": [0, 1, 2]})
-
-                await ws.send_text(json.dumps({
+                    # AI 确认技能选择
+                    result = await room.handle_message(1, {"type": "select_skills", "skill_indices": [0, 1, 2]})
+                    print(f"[单人模式] AI技能确认: {result}, ready_count={room.ready_count}")
+                except Exception as e:
+                    print(f"[单人模式] AI初始化失败: {e}")
+                    await ws.send_text(json.dumps({
+                        "type": "error", "message": f"AI初始化失败: {e}"
+                    }, ensure_ascii=False))
+                    continue
                     "type": "room_created",
                     "room_code": new_code,
                     "player_id": 0,
@@ -352,12 +358,17 @@ async def websocket_endpoint(ws: WebSocket, room_code: str, player_id: str):
                 # 如果对手是 AI，自动生成 AI 行动（玩家提交后立即生成，保证同时性）
                 other_pid = 1 - actual_pid
                 if room.state.players[other_pid].is_ai and not room.all_actions_received():
-                    ai_state = room.state.get_state_for_player(other_pid)
-                    ai_opponent = getattr(room, 'ai_opponent', None)
-                    if ai_opponent:
-                        # AI 在不知道玩家行动的情况下决策（state是回合开始前的）
-                        ai_action = ai_opponent.decide_action(ai_state, other_pid)
-                        await room.handle_message(other_pid, ai_action)
+                    try:
+                        ai_state = room.state.get_state_for_player(other_pid)
+                        ai_opponent = getattr(room, 'ai_opponent', None)
+                        if ai_opponent:
+                            ai_action = ai_opponent.decide_action(ai_state, other_pid)
+                            print(f"[AI行动] difficulty={getattr(room,'ai_difficulty','?')}, action={ai_action}")
+                            await room.handle_message(other_pid, ai_action)
+                    except Exception as e:
+                        print(f"[AI行动] 失败: {e}")
+                        # 回退：AI跳过
+                        await room.handle_message(other_pid, {"action": "move", "direction": "up"})
 
                 # 检查双方是否都提交了行动
                 if room.all_actions_received():
