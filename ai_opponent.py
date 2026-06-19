@@ -46,42 +46,45 @@ class AIOpponent:
         movable = state.get("movable_cells", [])
 
         if stunned:
-            return {"action": "pass"}
+            # 晕眩时随便发个合法行动，handle_message会自动跳过
+            return {"action": "move", "direction": "up"}
 
         # 计算到敌人的距离
         dist = abs(my_pos[0] - enemy_pos[0]) + abs(my_pos[1] - enemy_pos[1])
 
         # 随机犯错
         if random.random() < self.config["mistake_rate"]:
-            return self._random_action(movable, skills)
+            return self._random_action(movable, skills, my_pos)
 
         # 策略：有技能在范围就用技能，否则向敌人移动
         if skills and dist <= 3:
-            # 选择伤害最高的技能
             best_skill = max(range(len(skills)), key=lambda i: skills[i].get("damage", 0))
             skill = skills[best_skill]
             direction = self._direction_toward(my_pos, enemy_pos)
 
-            # 对于不需要方向的技能，不传direction
             if skill.get("range_type") in ("self_aura", "four_way", "multi_dash"):
                 return {"action": "skill", "skill_index": best_skill}
             return {"action": "skill", "skill_index": best_skill, "direction": direction}
 
         # 向敌人移动
         if movable:
-            # 选最接近敌人的可移动格
             best_move = min(movable, key=lambda cell: abs(cell[0] - enemy_pos[0]) + abs(cell[1] - enemy_pos[1]))
             direction = self._direction_from_to(my_pos, best_move)
             if direction:
                 return {"action": "move", "direction": direction}
 
-        return {"action": "pass"}
+        # 无路可走时随便选个方向（会被is_passable拦截，但格式合法）
+        return {"action": "move", "direction": random.choice(list(DIRECTIONS.keys()))}
 
-    def _random_action(self, movable: list, skills: list) -> dict:
-        """随机行动（用于低难度）"""
+    def _random_action(self, movable: list, skills: list, my_pos: list) -> dict:
+        """随机行动（用于低难度），方向从合法移动中选"""
         options = []
         if movable:
-            options.append({"action": "move", "direction": random.choice(list(DIRECTIONS.keys()))})
+            # 从合法移动中随机选一个
+            target = random.choice(movable)
+            direction = self._direction_from_to(my_pos, target)
+            if direction:
+                options.append({"action": "move", "direction": direction})
         if skills:
             idx = random.randrange(len(skills))
             skill = skills[idx]
@@ -90,7 +93,7 @@ class AIOpponent:
             else:
                 options.append({"action": "skill", "skill_index": idx, "direction": random.choice(list(DIRECTIONS.keys()))})
         if not options:
-            return {"action": "pass"}
+            return {"action": "move", "direction": random.choice(list(DIRECTIONS.keys()))}
         return random.choice(options)
 
     def _direction_toward(self, from_pos: list, to_pos: list) -> str:
