@@ -39,7 +39,6 @@ class PlayerState:
     position: Tuple[int, int] = (0, 0)
     stunned: bool = False       # 是否晕眩
     connected: bool = False
-    is_ai: bool = False          # 是否为AI玩家
     last_action: Optional[dict] = None  # 本回合的行动
     ws = None
 
@@ -637,7 +636,6 @@ class GameRoom:
         self.last_activity = time.time()
         self.empty_since: float = None  # 房间变空的时间（所有玩家离开时记录）
         self.host_player_id: str = ""   # 房主的玩家ID
-        self.offline_mode: bool = False  # 是否为离线模式
         self.side_rps_choices: Dict[int, str] = {}  # 选边猜拳 {player_id: choice}
         self.side_rps_winner: int = None  # 猜拳胜者
         self.side_selected: bool = False  # 胜者是否已选边
