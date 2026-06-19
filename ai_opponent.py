@@ -124,55 +124,45 @@ class AIOpponent:
         return mapping.get((ndr, ndc))
 
     def _api_decide(self, state: dict, pid: int) -> dict:
-        """使用 API 做决策（高难度）- 同步版本，由调用方在线程中执行"""
+        """使用 API 做决策（高难度）- 同步HTTP，超时3秒回退规则"""
         skills_info = []
         for i, s in enumerate(state.get("your_skills", [])):
-            skills_info.append(f"[{i}] {s['name']} 伤害{s['damage']} 类型{s['range_type']} 效果{','.join(s.get('effects',[]))}")
+            skills_info.append(f"[{i}] {s['name']} 伤害{s['damage']} 类型{s['range_type']}")
 
-        prompt = f"""你正在玩鬼灭之刃PVP对战游戏。你是{state.get('your_character', {}).get('name', 'AI')}。
-当前回合{state.get('turn',0)}，地图6行×12列。你的HP{state.get('your_hp',0)}，敌人HP{state.get('enemy_hp',0)}。
-你的位置({state['your_pos'][0]},{state['your_pos'][1]})，敌人位置({state['enemy_pos'][0]},{state['enemy_pos'][1]})。
-{'你处于晕眩状态，只能跳过。' if state.get('your_stunned') else ''}
-
-可用技能：
-{chr(10).join(skills_info)}
-
-可移动格子（坐标）：{state.get('movable_cells', [])}
-
-障碍物位置（1=障碍）：{state.get('map', [])}
-
-请选择最优行动，只返回JSON（不要其他文字）：
-{{"action":"move","direction":"方向"}} 或 {{"action":"skill","skill_index":数字,"direction":"方向"}} 或 {{"action":"pass"}}
+        prompt = f"""鬼灭PVP游戏。你是{state.get('your_character', {}).get('name', 'AI')}。
+回合{state.get('turn',0)}，HP{state.get('your_hp',0)}，敌HP{state.get('enemy_hp',0)}。
+位置({state['your_pos'][0]},{state['your_pos'][1]})，敌({state['enemy_pos'][0]},{state['enemy_pos'][1]})。
+技能：{'|'.join(skills_info)}
+可移动：{state.get('movable_cells', [])[:6]}
+只返回JSON：{{"action":"move","direction":"方向"}}或{{"action":"skill","skill_index":0,"direction":"方向"}}
 方向：up/down/left/right/ul/ur/dl/dr"""
 
         try:
+            # 用同步httpx，不嵌套事件循环
             import httpx
-            import asyncio
-
-            async def _call():
-                async with httpx.AsyncClient(timeout=10) as client:
-                    resp = await client.post(
-                        self.api_url,
-                        headers={"Content-Type": "application/json", "Authorization": f"Bearer {self.api_key}"},
-                        json={
-                            "model": self.model,
-                            "messages": [
-                                {"role": "system", "content": "你是一个鬼灭之刃PVP游戏AI。只返回JSON，不返回其他内容。"},
-                                {"role": "user", "content": prompt},
-                            ],
-                            "max_tokens": 100,
-                            "temperature": 0.3,
-                        },
-                    )
-                    data = resp.json()
-                    text = data.get("choices", [{}])[0].get("message", {}).get("content", "{}")
-                    # 提取JSON
-                    import re
-                    match = re.search(r'\{[^}]+\}', text)
-                    if match:
-                        return json.loads(match.group())
-                    return {"action": "pass"}
-            return asyncio.run(_call())
+            with httpx.Client(timeout=3) as client:
+                resp = client.post(
+                    self.api_url,
+                    headers={"Content-Type": "application/json", "Authorization": f"Bearer {self.api_key}"},
+                    json={
+                        "model": self.model,
+                        "messages": [
+                            {"role": "system", "content": "只返回JSON动作，不解释。"},
+                            {"role": "user", "content": prompt},
+                        ],
+                        "max_tokens": 80,
+                        "temperature": 0.2,
+                    },
+                )
+                data = resp.json()
+                text = data.get("choices", [{}])[0].get("message", {}).get("content", "{}")
+                import re
+                match = re.search(r'\{[^}]+\}', text)
+                if match:
+                    action = json.loads(match.group())
+                    if action.get("action") in ("move", "skill"):
+                        return action
         except Exception:
-            # API 失败时回退到规则
-            return self._rule_decide(state, pid)
+            pass
+        # 任何失败回退规则AI
+        return self._rule_decide(state, pid)
