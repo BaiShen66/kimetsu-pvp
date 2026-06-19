@@ -177,6 +177,7 @@
     <script>
         // 工具函数 — 必须最先定义
         const $ = (id) => document.getElementById(id);
+        const $$ = (sel) => document.querySelectorAll(sel);
 
         // ========== 玩家系统 ==========
         function updatePlayerUI() {
@@ -263,7 +264,10 @@
             $('side-rps-msg').textContent = msg || '赢的人选择阵营！';
             $('side-rps-modal').classList.remove('hidden');
             $('side-rps-waiting').classList.add('hidden');
-            $$('.side-rps-btn').forEach(b => b.disabled = false);
+            $$('.side-rps-btn').forEach(b => {
+                b.disabled = false;
+                b.classList.remove('selected');
+            });
         }
         function hideSideRPSModal() {
             $('side-rps-modal').classList.add('hidden');
@@ -284,12 +288,19 @@
             }
         }
 
-        // 猜拳按钮
+        // 猜拳按钮 — 选中高亮 + 确认反馈
+        const CHOICE_NAMES = { rock: '✊石头', scissors: '✌️剪刀', paper: '🖐️布' };
         document.querySelectorAll('.side-rps-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const choice = btn.dataset.choice;
-                btn.disabled = true;
-                $$('.side-rps-btn').forEach(b => b.disabled = true);
+                // 高亮选中的按钮
+                $$('.side-rps-btn').forEach(b => {
+                    b.classList.remove('selected');
+                    b.disabled = true;
+                });
+                btn.classList.add('selected');
+                // 显示"你出了X"
+                $('side-rps-msg').textContent = `你出了 ${CHOICE_NAMES[choice]}，等待对手...`;
                 $('side-rps-waiting').classList.remove('hidden');
                 send({ type: 'side_rps_choice', choice: choice });
             });

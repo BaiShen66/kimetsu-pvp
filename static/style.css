@@ -1319,6 +1319,24 @@ input[type="text"]:focus {
     box-shadow: 0 8px 24px rgba(240, 192, 96, 0.3);
 }
 
+.rps-btn.selected {
+    border-color: var(--accent-gold);
+    background: rgba(240, 192, 96, 0.25);
+    box-shadow: 0 0 20px rgba(240, 192, 96, 0.5);
+    transform: scale(1.08);
+}
+
+.rps-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.rps-btn.selected:disabled {
+    opacity: 1;
+    cursor: default;
+}
+
 .rps-icon {
     font-size: 48px;
 }
