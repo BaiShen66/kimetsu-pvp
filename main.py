@@ -362,15 +362,11 @@ async def websocket_endpoint(ws: WebSocket, room_code: str, player_id: str):
                 if (pick == "human" and winner_pid != 0) or (pick == "demon" and winner_pid != 1):
                     p0 = room.state.players[0]
                     p1 = room.state.players[1]
-                    # 交换角色
+                    # 只交换角色和名字，不交换ws（ws必须跟随pid不变）
                     p0.character, p1.character = p1.character, p0.character
                     p0.max_hp, p1.max_hp = p1.max_hp, p0.max_hp
                     p0.position, p1.position = p1.position, p0.position
-                    # 交换名字
                     p0.name, p1.name = p1.name, p0.name
-                    # 交换ws（让ws跟随角色，这样pid=0的ws始终操控人方）
-                    p0.ws, p1.ws = p1.ws, p0.ws
-                    print(f"[选边] {p0.name}(pid0)={p0.character.name} | {p1.name}(pid1)={p1.character.name}")
 
                 room.side_selected = True
 
