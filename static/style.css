@@ -543,6 +543,9 @@ input[type="text"]:focus {
     align-items: center;
     justify-content: center;
     font-size: 20px;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
 }
 
 .map-cell:hover {
@@ -913,6 +916,8 @@ input[type="text"]:focus {
 }
 
 /* ========== 响应式 ========== */
+
+/* 平板 (768px - 1024px) */
 @media (max-width: 1024px) {
     .game-map {
         grid-template-columns: repeat(12, 36px);
@@ -923,30 +928,325 @@ input[type="text"]:focus {
         height: 36px;
         font-size: 14px;
     }
+    .map-cell .coord-label {
+        display: none;
+    }
     .player-panel, .log-panel {
-        width: 150px;
+        width: 140px;
         padding: 10px;
         font-size: 12px;
     }
     .btn-action {
-        padding: 8px 14px;
+        padding: 8px 12px;
         font-size: 12px;
-    }
-}
-
-@media (max-width: 768px) {
-    .game-main {
-        flex-direction: column;
-    }
-    .player-panel, .log-panel {
-        width: 100%;
-        flex-direction: row;
-        flex-wrap: wrap;
     }
     .skill-grid {
         grid-template-columns: repeat(2, 1fr);
     }
+}
+
+/* ========== 手机端 (≤ 768px) ========== */
+@media (max-width: 768px) {
+    /* --- 全局 --- */
+    body {
+        font-size: 14px;
+    }
+    .game-body {
+        height: 100dvh;
+        overflow-y: auto;
+    }
+
+    /* --- 大厅 --- */
     .game-title {
         font-size: 28px;
+    }
+    .game-subtitle {
+        font-size: 18px;
+        letter-spacing: 2px;
+    }
+    .lobby-card {
+        padding: 20px;
+        max-width: 100%;
+    }
+    .lobby-buttons .btn {
+        padding: 14px;
+        font-size: 16px;
+    }
+    .code-text {
+        font-size: 24px;
+        letter-spacing: 4px;
+    }
+
+    /* --- 游戏头部 --- */
+    .game-header {
+        padding: 8px 12px;
+    }
+    .game-logo {
+        font-size: 14px;
+    }
+    .turn-badge {
+        font-size: 13px;
+        padding: 4px 14px;
+    }
+    .room-badge {
+        font-size: 11px;
+    }
+
+    /* --- 主布局纵向堆叠 --- */
+    .game-main {
+        flex-direction: column;
+        padding: 6px;
+        gap: 6px;
+        overflow-y: auto;
+        flex: 1;
+    }
+
+    /* --- 玩家面板横向紧凑 --- */
+    .player-panel {
+        width: 100%;
+        flex-direction: row;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 12px;
+        flex-shrink: 0;
+        flex-wrap: wrap;
+    }
+    .panel-header {
+        gap: 4px;
+    }
+    .panel-header span {
+        font-size: 20px;
+    }
+    .panel-header h3 {
+        font-size: 13px;
+    }
+    .hp-section {
+        flex: 1;
+        min-width: 80px;
+    }
+    .hp-bar-container {
+        height: 10px;
+    }
+    .hp-text {
+        font-size: 12px;
+        min-width: 32px;
+    }
+    .skill-list {
+        display: none; /* 手机上隐藏技能列表节省空间 */
+    }
+
+    /* --- 日志面板 --- */
+    .log-panel {
+        width: 100%;
+        max-height: 100px;
+        flex-shrink: 0;
+        padding: 8px 12px;
+        order: 3;
+    }
+    .log-panel h3 {
+        font-size: 12px;
+        margin-bottom: 4px;
+    }
+    .battle-log {
+        font-size: 11px;
+        max-height: 60px;
+    }
+
+    /* --- 地图容器 --- */
+    .map-container {
+        order: 2;
+        flex: 1;
+        min-height: 0;
+        overflow: auto;
+    }
+    .map-wrapper {
+        padding: 4px;
+    }
+    .game-map {
+        grid-template-columns: repeat(12, minmax(24px, 1fr));
+        grid-template-rows: repeat(6, minmax(24px, 1fr));
+        gap: 1px;
+        width: 100%;
+        max-width: 100vw;
+        aspect-ratio: 12 / 6;
+    }
+    .map-cell {
+        width: auto;
+        height: auto;
+        aspect-ratio: 1;
+        font-size: 12px;
+        border-radius: 2px;
+    }
+    .map-cell .coord-label {
+        display: none;
+    }
+    .map-cell.obstacle::after {
+        font-size: 12px;
+    }
+    .map-legend {
+        flex-wrap: wrap;
+        gap: 8px;
+        font-size: 10px;
+        justify-content: center;
+    }
+
+    /* --- 底部操作栏 --- */
+    .action-bar {
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 8px 10px;
+    }
+    .your-info {
+        width: 100%;
+        justify-content: center;
+        gap: 6px;
+        font-size: 13px;
+    }
+    .your-info > span:first-child {
+        font-size: 18px;
+    }
+    .action-buttons {
+        width: 100%;
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+    .btn-action {
+        flex: 1 1 auto;
+        min-width: 60px;
+        padding: 12px 8px;
+        font-size: 12px;
+        text-align: center;
+        justify-content: center;
+    }
+    .confirm-section {
+        width: 100%;
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+    .btn-confirm {
+        width: 100%;
+        padding: 14px;
+        font-size: 16px;
+    }
+    .btn-cancel {
+        width: 100%;
+        padding: 12px;
+    }
+    .waiting-indicator {
+        width: 100%;
+        justify-content: center;
+    }
+
+    /* --- 方向选择器 --- */
+    .direction-picker {
+        padding: 6px;
+    }
+    .direction-grid {
+        grid-template-columns: repeat(3, 44px);
+        grid-template-rows: repeat(3, 44px);
+    }
+    .dir-btn {
+        width: 44px;
+        height: 44px;
+        font-size: 20px;
+    }
+
+    /* --- 技能选择 --- */
+    .skill-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+    }
+    .skill-card {
+        padding: 12px;
+    }
+    .skill-card .skill-name {
+        font-size: 14px;
+    }
+
+    /* --- 猜拳弹窗 --- */
+    .modal-content {
+        padding: 20px;
+        max-width: 95vw;
+    }
+    .modal-content h2 {
+        font-size: 22px;
+    }
+    .rps-buttons {
+        flex-direction: row;
+        gap: 8px;
+    }
+    .rps-btn {
+        width: 90px;
+        height: 110px;
+        flex: 1;
+    }
+    .rps-icon {
+        font-size: 36px;
+    }
+
+    /* --- 游戏结束弹窗 --- */
+    .game-over-content h1 {
+        font-size: 28px;
+    }
+
+    /* --- 方向选择器（用于技能的目标选择）--- */
+    .direction-picker .direction-grid {
+        grid-template-columns: repeat(3, 40px);
+        grid-template-rows: repeat(3, 40px);
+    }
+    .direction-picker .dir-btn {
+        width: 40px;
+        height: 40px;
+        font-size: 18px;
+    }
+}
+
+/* ========== 小屏手机 (≤ 400px) ========== */
+@media (max-width: 400px) {
+    .game-map {
+        grid-template-columns: repeat(12, minmax(20px, 1fr));
+        grid-template-rows: repeat(6, minmax(20px, 1fr));
+    }
+    .map-cell {
+        font-size: 10px;
+    }
+    .map-cell.obstacle::after {
+        font-size: 10px;
+    }
+    .btn-action {
+        padding: 10px 6px;
+        font-size: 11px;
+        min-width: 50px;
+    }
+    .game-title {
+        font-size: 22px;
+    }
+    .game-subtitle {
+        font-size: 14px;
+    }
+    .skill-grid {
+        grid-template-columns: 1fr;
+    }
+    .rps-btn {
+        width: 70px;
+        height: 90px;
+    }
+    .rps-icon {
+        font-size: 28px;
+    }
+    .direction-grid {
+        grid-template-columns: repeat(3, 36px);
+        grid-template-rows: repeat(3, 36px);
+    }
+    .dir-btn {
+        width: 36px;
+        height: 36px;
+        font-size: 16px;
+    }
+    .modal-content {
+        padding: 16px;
+    }
+    .modal-content h2 {
+        font-size: 18px;
     }
 }
