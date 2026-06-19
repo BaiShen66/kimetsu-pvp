@@ -72,16 +72,27 @@ async def game_page():
 
 @app.get("/api/rooms")
 async def list_rooms():
-    """返回可加入的房间列表"""
-    available = []
+    """返回所有活跃房间列表"""
+    result = []
     for code, room in rooms.items():
-        if not room.state.game_over and room.state.players[0].connected and not room.state.players[1].connected:
-            available.append({
-                "room_code": code,
-                "host_name": room.state.players[0].name,
-                "created_seconds_ago": int(time.time() - room.created_at),
-            })
-    return {"rooms": available}
+        if room.state.game_over:
+            continue
+        connected = sum(1 for p in room.state.players if p.connected)
+        if connected == 0:
+            continue
+
+        max_players = len(room.state.players)
+        in_game = room.ready_count >= 2
+
+        result.append({
+            "room_code": code,
+            "host_name": room.state.players[0].name,
+            "players": connected,
+            "max_players": max_players,
+            "in_game": in_game,
+            "created_seconds_ago": int(time.time() - room.created_at),
+        })
+    return {"rooms": result}
 
 
 @app.websocket("/ws/{room_code}/{player_id}")

@@ -348,26 +348,34 @@
                 const resp = await fetch('/api/rooms');
                 const data = await resp.json();
                 if (data.rooms.length === 0) {
-                    list.innerHTML = '<p class="room-empty">暂无可用房间，创建一个吧！</p>';
+                    list.innerHTML = '<p class="room-empty">暂无房间，创建一个吧！</p>';
                 } else {
-                    list.innerHTML = data.rooms.map(r => `
-                        <div class="room-item">
-                            <div class="room-item-info">
+                    list.innerHTML = data.rooms.map(r => {
+                        const canJoin = r.players < r.max_players && !r.in_game;
+                        const full = r.players >= r.max_players || r.in_game;
+                        const rowCls = full ? (r.in_game ? 'status-ingame' : 'status-full') : 'status-waiting';
+                        const badgeText = r.in_game ? '对战中' : `${r.players}/${r.max_players}`;
+                        const badgeCls = r.in_game ? 'ingame' : (full ? 'full' : 'waiting');
+                        return `
+                        <div class="room-item ${rowCls}">
+                            <div class="room-item-left">
                                 <span class="room-item-code">${r.room_code}</span>
                                 <span class="room-item-host">👤 ${r.host_name}</span>
                                 <span class="room-item-time">${r.created_seconds_ago}秒前</span>
                             </div>
-                            <button class="btn btn-sm btn-secondary join-room-btn" data-code="${r.room_code}">
-                                🚪 加入
-                            </button>
+                            <div class="room-item-right">
+                                <span class="room-count-badge ${badgeCls}">${badgeText}</span>
+                                ${canJoin
+                                    ? `<button class="btn btn-sm btn-secondary join-room-btn" data-code="${r.room_code}">🚪 加入</button>`
+                                    : `<button class="btn btn-sm" disabled>${r.in_game ? '🔒' : '已满'}</button>`
+                                }
+                            </div>
                         </div>
-                    `).join('');
+                    `}).join('');
 
-                    // 绑定加入按钮
                     list.querySelectorAll('.join-room-btn').forEach(btn => {
                         btn.addEventListener('click', () => {
-                            const code = btn.dataset.code;
-                            $('room-code-input').value = code;
+                            $('room-code-input').value = btn.dataset.code;
                             $('btn-join').click();
                         });
                     });
