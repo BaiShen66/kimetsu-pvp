@@ -158,27 +158,50 @@ function handleMessage(msg) {
     switch (msg.type) {
         case 'game_state':
         case 'game_start':
-            updateFullState(msg);
+            if (IS_OFFLINE && msg.for_player !== undefined) {
+                state.bothStates = state.bothStates || {};
+                state.bothStates[msg.for_player] = msg;
+                updateFullState(msg);
+            } else {
+                updateFullState(msg);
+            }
             if (msg.type === 'game_start') {
                 addLog('⚔️ 战斗开始！');
             }
             break;
 
         case 'turn_result':
-            updateFullState(msg);
-            if (msg.turn_log) {
-                msg.turn_log.forEach(log => addLog(log));
+            if (IS_OFFLINE && msg.for_player !== undefined) {
+                // 离线模式：存储双方视角
+                state.bothStates = state.bothStates || {};
+                state.bothStates[msg.for_player] = msg;
+                // 只取最后一方的日志
+                if (msg.for_player === 0 && msg.turn_log) {
+                    msg.turn_log.forEach(log => addLog(log));
+                }
+                // 双方都收到后，用当前操控方的视角更新
+                if (state.bothStates[0] && state.bothStates[1]) {
+                    updateFullState(state.bothStates[state.controllingPlayer]);
+                    state.actionConfirmed = false;
+                    state.offlineActions = {};
+                    resetActionUI();
+                }
+            } else {
+                updateFullState(msg);
+                if (msg.turn_log) {
+                    msg.turn_log.forEach(log => addLog(log));
+                }
+                state.actionConfirmed = false;
+                state.offlineActions = {};
+                if (IS_OFFLINE) {
+                    state.controllingPlayer = 0;
+                    switchControllingPlayer();
+                }
+                resetActionUI();
             }
-            state.actionConfirmed = false;
-            state.offlineActions = {};
-            if (IS_OFFLINE) {
-                state.controllingPlayer = 0;
-                switchControllingPlayer();
-            }
-            resetActionUI();
 
             // 检查是否有待处理的猜拳
-            if (msg.pending_rps) {
+            if (msg.pending_rps && (!IS_OFFLINE || msg.for_player === 0)) {
                 showRPSModal(msg.rps_skill_name);
             }
 
@@ -916,14 +939,20 @@ state.controllingPlayer = 0;  // 当前操控哪个玩家
 state.offlineActions = {};     // {0: action, 1: action}
 
 function switchControllingPlayer() {
-    state.controllingPlayer = 1 - state.controllingPlayer;
-    // 更新UI：显示当前操控角色
-    const name = state.controllingPlayer === 0
+    const newPid = 1 - state.controllingPlayer;
+    state.controllingPlayer = newPid;
+
+    // 用存好的对方视角更新UI
+    if (state.bothStates && state.bothStates[newPid]) {
+        updateFullState(state.bothStates[newPid]);
+    }
+
+    const name = newPid === 0
         ? (state.yourCharacter?.name || '炭治郎')
         : (state.enemyCharacter?.name || '猗窝座');
     $('controlling-label').textContent = `当前操控: ${name}`;
     $('controlling-panel').classList.remove('hidden');
-    // 重置按钮
+
     clearActionHighlights();
     $$('.btn-action').forEach(b => b.disabled = false);
     updateSkillButtons();

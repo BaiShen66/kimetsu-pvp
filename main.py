@@ -82,6 +82,7 @@ async def _process_and_broadcast_turn(room):
             try:
                 st = room.state.get_state_for_player(pidx)
                 st["type"] = "turn_result"
+                st["for_player"] = pidx
                 st["turn_log"] = turn_result["log"]
                 st["pending_rps"] = room.state.pending_rps and room.state.rps_player_id == pidx
                 if st["pending_rps"]:
@@ -355,6 +356,7 @@ async def websocket_endpoint(ws: WebSocket, room_code: str, player_id: str):
                                 st = room.state.get_state_for_player(pidx)
                                 st["type"] = "game_start"
                                 st["player_id"] = pidx
+                                st["for_player"] = pidx
                                 st["player_name"] = p.name
                                 st["offline"] = getattr(room, 'offline_mode', False)
                                 await p.ws.send_text(json.dumps(st, ensure_ascii=False))
@@ -462,6 +464,7 @@ async def websocket_endpoint(ws: WebSocket, room_code: str, player_id: str):
                 st = room.state.get_state_for_player(actual_pid)
                 st["type"] = "game_state"
                 st["player_id"] = actual_pid
+                st["for_player"] = actual_pid
                 await ws.send_text(json.dumps(st, ensure_ascii=False))
 
             else:
