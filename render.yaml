@@ -9,6 +9,6 @@ services:
       - key: GUIDE_API_KEY
         sync: false
       - key: GUIDE_API_URL
-        sync: false
+        value: https://api.deepseek.com/v1/chat/completions
       - key: GUIDE_MODEL
-        sync: false
+        value: deepseek-chat

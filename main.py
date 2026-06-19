@@ -73,8 +73,8 @@ async def game_page():
 
 # ====== AI 向导代理 ======
 GUIDE_API_KEY = os.environ.get("GUIDE_API_KEY", "")
-GUIDE_API_URL = os.environ.get("GUIDE_API_URL", "https://api.openai.com/v1/chat/completions")
-GUIDE_MODEL = os.environ.get("GUIDE_MODEL", "gpt-3.5-turbo")
+GUIDE_API_URL = os.environ.get("GUIDE_API_URL", "https://api.deepseek.com/v1/chat/completions")
+GUIDE_MODEL = os.environ.get("GUIDE_MODEL", "deepseek-chat")
 
 
 @app.post("/api/guide")
