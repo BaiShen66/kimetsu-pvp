@@ -353,13 +353,11 @@ input[type="text"]:focus {
 
 /* ========== AI 向导 ========== */
 .guide-section {
-    margin-top: 16px;
-    background: var(--bg-panel);
+    margin-top: 20px;
+    background: var(--bg-card);
     border: 1px solid var(--border-color);
-    border-radius: 12px;
+    border-radius: 10px;
     overflow: hidden;
-    width: 100%;
-    max-width: 480px;
 }
 
 .guide-header {

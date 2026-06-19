@@ -84,26 +84,26 @@
                     <button id="btn-refresh-rooms" class="btn btn-sm">🔄 刷新</button>
                 </div>
 
-                <div id="lobby-error" class="error-message hidden"></div>
-            </div>
-        </div>
+                <!-- 向导聊天 -->
+                <div id="guide-section" class="guide-section">
+                    <div class="guide-header" id="guide-toggle">
+                        <span class="guide-avatar">🦋</span>
+                        <span class="guide-title">蝴蝶忍 · 虫柱导师</span>
+                        <span class="guide-arrow">▼</span>
+                    </div>
+                    <div id="guide-body" class="guide-body hidden">
+                        <div id="guide-messages" class="guide-messages"></div>
+                        <div class="guide-input-row">
+                            <input type="text" id="guide-input" placeholder="请教导师..." maxlength="120">
+                            <button id="btn-guide-send" class="btn btn-sm btn-primary">发送</button>
+                        </div>
+                        <div class="guide-actions">
+                            <button id="btn-guide-clear" class="btn btn-sm">清除对话</button>
+                        </div>
+                    </div>
+                </div>
 
-        <!-- 向导聊天 -->
-        <div id="guide-section" class="guide-section">
-            <div class="guide-header" id="guide-toggle">
-                <span class="guide-avatar">🦋</span>
-                <span class="guide-title">蝴蝶忍 · 虫柱导师</span>
-                <span class="guide-arrow">▼</span>
-            </div>
-            <div id="guide-body" class="guide-body hidden">
-                <div id="guide-messages" class="guide-messages"></div>
-                <div class="guide-input-row">
-                    <input type="text" id="guide-input" placeholder="请教导师..." maxlength="120">
-                    <button id="btn-guide-send" class="btn btn-sm btn-primary">发送</button>
-                </div>
-                <div class="guide-actions">
-                    <button id="btn-guide-clear" class="btn btn-sm">清除对话</button>
-                </div>
+                <div id="lobby-error" class="error-message hidden"></div>
             </div>
         </div>
 
