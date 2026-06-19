@@ -425,8 +425,19 @@ async def websocket_endpoint(ws: WebSocket, room_code: str, player_id: str):
                     except Exception:
                         pass
 
-                # 广播更新后的状态
-                if room.state.game_over:
+                # 平局：重新发猜拳请求
+                if response.get("retry"):
+                    if human_player.ws:
+                        try:
+                            st = room.state.get_state_for_player(human_pid)
+                            st["type"] = "turn_result"
+                            st["pending_rps"] = True
+                            st["rps_skill_name"] = room.state.rps_skill_name
+                            st["for_player"] = human_pid
+                            await human_player.ws.send_text(json.dumps(st, ensure_ascii=False))
+                        except Exception:
+                            pass
+                elif room.state.game_over:
                     for pidx in [0, 1]:
                         p = room.state.players[pidx]
                         if p.ws:
@@ -441,13 +452,13 @@ async def websocket_endpoint(ws: WebSocket, room_code: str, player_id: str):
                             except Exception:
                                 pass
                 else:
-                    # 猜拳结束但游戏未结束，广播回合结果（继续下一回合）
                     for pidx in [0, 1]:
                         p = room.state.players[pidx]
                         if p.ws:
                             try:
                                 st = room.state.get_state_for_player(pidx)
                                 st["type"] = "rps_turn_end"
+                                st["for_player"] = pidx
                                 await p.ws.send_text(json.dumps(st, ensure_ascii=False))
                             except Exception:
                                 pass
