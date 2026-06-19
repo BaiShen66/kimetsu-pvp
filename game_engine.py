@@ -517,38 +517,18 @@ class GameState:
         else:
             result = "lose"
 
-        damage = self._rps_damage_pending if result == "win" else 0
         demon_pid = 1 - player_id
 
-        if damage > 0:
-            self.players[demon_pid].hp -= damage
-            self.log.append(
-                f"✊ {self.players[player_id].name} 猜拳 {human_choice} vs {demon_choice} —— 胜利！造成 {damage} 点伤害！"
-            )
-        elif result == "draw":
-            # 平局：不清除 pending_rps，再来一次
-            self.log.append(
-                f"✊ {self.players[player_id].name} 猜拳 {human_choice} vs {demon_choice} —— 平局！再来一次！"
-            )
-            return {
-                "result": "draw",
-                "human_choice": human_choice,
-                "demon_choice": demon_choice,
-                "damage": 0,
-                "game_over": False,
-                "retry": True,
-            }
-        else:
-            self.log.append(
-                f"✊ {self.players[player_id].name} 猜拳 {human_choice} vs {demon_choice} —— 失败，无伤害！"
-            )
-
-        # 检查鬼方是否死亡
-        if self.players[demon_pid].hp <= 0:
+        if result == "win":
+            # 砍头秒杀
+            self.players[demon_pid].hp = 0
             self.game_over = True
             self.winner = player_id
-            self.log.append(f"💀 {self.players[demon_pid].name} 被击败！")
-            self.log.append(f"🏆 {self.players[player_id].name} 获胜！")
+            self.log.append(f"⚔️ 砍头斩杀！{self.players[demon_pid].name} 被击败！")
+        elif result == "draw":
+            self.log.append(f"✊ 平局，没砍下")
+        else:
+            self.log.append(f"🛡️ 鬼防住了")
 
         self.pending_rps = False
         self.rps_player_id = 0
@@ -557,7 +537,6 @@ class GameState:
             "result": result,
             "human_choice": human_choice,
             "demon_choice": demon_choice,
-            "damage": damage,
             "game_over": self.game_over,
             "winner": self.winner,
         }

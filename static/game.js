@@ -177,28 +177,10 @@ function handleMessage(msg) {
             }
             break;
 
-        case 'rps_waiting':
-            // 已提交，等待对方
-            hideRPSModal();
-            break;
-
         case 'rps_result':
-            addLog(`✊ 你出 ${getRPSName(msg.human_choice)}，鬼出 ${getRPSName(msg.demon_choice)} — ${msg.result === 'win' ? '胜利！' : msg.result === 'draw' ? '平局！再来！' : '失败'}`);
-            if (msg.damage > 0) {
-                addLog(`💥 造成 ${msg.damage} 点伤害！`);
-            }
-            if (msg.game_over) {
-                hideRPSModal();
-                state.gameOver = true;
-                showGameOver(msg);
-            } else if (msg.retry) {
-                // 平局继续猜拳，不关闭弹窗
-                state.rpsSeconds = 5;
-                $('rps-countdown').textContent = state.rpsSeconds;
-                $('rps-countdown').parentElement.classList.remove('urgent');
-            } else {
-                hideRPSModal();
-            }
+            addLog(`✊ ${getRPSName(msg.human_choice)} vs ${getRPSName(msg.demon_choice)} — ${msg.result === 'win' ? '⚔️ 砍头斩杀！' : msg.result === 'draw' ? '平局，没砍下' : '鬼防住了'}`);
+            hideRPSModal();
+            if (msg.game_over) { state.gameOver = true; showGameOver(msg); }
             break;
 
         case 'rps_turn_end':
