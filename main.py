@@ -227,53 +227,6 @@ async def websocket_endpoint(ws: WebSocket, room_code: str, player_id: str):
                     }
                 }, ensure_ascii=False))
 
-            elif msg_type == "create_single_player":
-                # 线下热座模式：玩家操控双方
-                new_code = generate_room_code()
-                while new_code in rooms:
-                    new_code = generate_room_code()
-
-                room = GameRoom(new_code)
-                rooms[new_code] = room
-                room.setup_characters()
-                room.state.players[0].name = message.get("player_name", "玩家")
-                room.state.players[0].ws = ws
-                room.state.players[0].connected = True
-                # 玩家1也是同一个玩家
-                room.state.players[1].name = message.get("player_name", "玩家") + "(鬼方)"
-                room.state.players[1].ws = ws
-                room.state.players[1].connected = True
-                room.host_player_id = message.get("player_id", "")
-                room.offline_mode = True
-
-                # 确认鬼方技能
-                try:
-                    result = await room.handle_message(1, {"type": "select_skills", "skill_indices": [0, 1, 2]})
-                    print(f"[DEBUG] create_single_player 鬼方技能确认: {result}, ready_count={room.ready_count}")
-                except Exception as e:
-                    print(f"离线鬼方技能确认失败: {e}")
-
-                await ws.send_text(json.dumps({
-                    "type": "room_created",
-                    "room_code": new_code,
-                    "player_id": 0,
-                    "single_player": True,
-                    "offline": True,
-                    "character": {
-                        "name": room.state.players[0].character.name,
-                        "title": room.state.players[0].character.title,
-                        "faction": room.state.players[0].character.faction,
-                        "emoji": room.state.players[0].character.emoji,
-                        "max_hp": room.state.players[0].character.max_hp,
-                        "skills": [
-                            {"index": i, "name": s.name, "range_type": s.range_type,
-                             "damage": s.damage, "effects": s.effects,
-                             "description": s.description}
-                            for i, s in enumerate(room.state.players[0].character.skills)
-                        ]
-                    }
-                }, ensure_ascii=False))
-
             elif msg_type == "join_room":
                 join_code = message.get("room_code", "").strip().upper()
                 room = rooms.get(join_code)
@@ -457,12 +410,6 @@ async def websocket_endpoint(ws: WebSocket, room_code: str, player_id: str):
                 await ws.send_text(json.dumps(response, ensure_ascii=False))
 
                 # 检查双方是否都准备好了（离线模式鬼方在create时已确认）
-                print(f"[DEBUG] select_skills ready_count={room.ready_count} all_ready={room.all_ready()} offline={getattr(room, 'offline_mode', False)}")
-                if not room.all_ready():
-                    await ws.send_text(json.dumps({
-                        "type": "error",
-                        "message": f"等待对手确认(ready={room.ready_count})"
-                    }, ensure_ascii=False))
                 if room.all_ready():
                     room.state.generate_map()
 
@@ -476,7 +423,6 @@ async def websocket_endpoint(ws: WebSocket, room_code: str, player_id: str):
                                 st["player_id"] = pidx
                                 st["for_player"] = pidx
                                 st["player_name"] = p.name
-                                st["offline"] = getattr(room, 'offline_mode', False)
                                 await p.ws.send_text(json.dumps(st, ensure_ascii=False))
                             except Exception:
                                 pass
@@ -495,23 +441,6 @@ async def websocket_endpoint(ws: WebSocket, room_code: str, player_id: str):
                 # 检查双方是否都提交了行动
                 if room.all_actions_received():
                     await _process_and_broadcast_turn(room)
-
-            elif msg_type == "offline_turn":
-                # 线下模式：同时提交双方行动
-                if room is None:
-                    await ws.send_text(json.dumps({"type": "error", "message": "未加入房间"}, ensure_ascii=False))
-                    continue
-
-                actions = message.get("actions", {})
-                for pid_str, action in actions.items():
-                    pid_val = int(pid_str)
-                    # 补上 type 字段，handle_message 需要它
-                    action["type"] = "select_action"
-                    await room.handle_message(pid_val, action)
-
-                if room.all_actions_received():
-                    await _process_and_broadcast_turn(room)
-                    # pending_rps 已在 _process_and_broadcast_turn 的每条消息中发送，不重复
 
             elif msg_type == "rps_choice":
                 if room is None:
@@ -586,14 +515,6 @@ async def websocket_endpoint(ws: WebSocket, room_code: str, player_id: str):
                 st["for_player"] = actual_pid
                 await ws.send_text(json.dumps(st, ensure_ascii=False))
 
-                # 离线模式：同时发送另一方状态
-                if getattr(room, 'offline_mode', False):
-                    other_pid = 1 - actual_pid
-                    st2 = room.state.get_state_for_player(other_pid)
-                    st2["type"] = "game_state"
-                    st2["player_id"] = other_pid
-                    st2["for_player"] = other_pid
-                    await ws.send_text(json.dumps(st2, ensure_ascii=False))
 
             else:
                 await ws.send_text(json.dumps({

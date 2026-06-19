@@ -104,9 +104,6 @@
                     <button id="btn-create" class="btn btn-primary">
                         <span class="btn-icon">🏠</span> 创建房间
                     </button>
-                    <button id="btn-single-player" class="btn btn-primary" style="background:#7b2d8b;">
-                        <span class="btn-icon">🎮</span> 离线模式
-                    </button>
                     <div class="divider">
                         <span>或</span>
                     </div>
@@ -244,8 +241,6 @@
         let roomCode = null;
         let playerId = null;
         let characterData = null;
-        let isOffline = false;
-
         // 直接取缓存名字，不再读输入框
         function getPlayerName() {
             return Player.getName();
@@ -355,20 +350,11 @@
                     roomCode = msg.room_code;
                     playerId = msg.player_id;
                     characterData = msg.character;
-                    isOffline = msg.offline || false;
-                    if (msg.single_player) {
-                        // 单人模式：直接进入选技能
-                        $('btn-create').disabled = true;
-                        $('btn-join').disabled = true;
-                        hideError('lobby-error');
-                        showSkillSelection();
-                    } else {
-                        $('room-code-text').textContent = roomCode;
-                        $('room-info').classList.remove('hidden');
-                        $('btn-create').disabled = true;
-                        $('btn-join').disabled = true;
-                        hideError('lobby-error');
-                    }
+                    $('room-code-text').textContent = roomCode;
+                    $('room-info').classList.remove('hidden');
+                    $('btn-create').disabled = true;
+                    $('btn-join').disabled = true;
+                    hideError('lobby-error');
                     break;
 
                 case 'room_joined':
@@ -430,12 +416,10 @@
                         roomCode: roomCode,
                         playerId: playerId,
                         playerName: playerName,
-                        offline: isOffline || false,
                     }));
                     showPhase('redirect');
                     setTimeout(() => {
-                        const offlineParam = isOffline ? '&offline=1' : '';
-                        window.location.href = `/game?room=${roomCode}&player=${playerId}${offlineParam}`;
+                        window.location.href = `/game?room=${roomCode}&player=${playerId}`;
                     }, 800);
                     break;
 
@@ -532,23 +516,6 @@
                 el.classList.add('hidden');
             }
         }
-
-        // ========== 线下模式 ==========
-        $('btn-single-player').addEventListener('click', () => {
-            playerName = getPlayerName();
-            hideError('lobby-error');
-            connectWebSocket('lobby', 0);
-            const checkConnection = setInterval(() => {
-                if (ws && ws.readyState === WebSocket.OPEN) {
-                    clearInterval(checkConnection);
-                    send({
-                        type: 'create_single_player',
-                        player_name: playerName,
-                        player_id: Player.getId(),
-                    });
-                }
-            }, 100);
-        });
 
         // ========== 事件绑定 ==========
         $('btn-create').addEventListener('click', () => {

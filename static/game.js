@@ -159,61 +159,17 @@ function handleMessage(msg) {
         case 'game_state':
         case 'game_start':
             updateFullState(msg);
-            if (IS_OFFLINE && msg.for_player !== undefined) {
-                state.bothStates = state.bothStates || {};
-                state.bothStates[msg.for_player] = msg;
-            }
-            if (IS_OFFLINE && state.bothStates[0] && state.bothStates[1]) {
-                // 双方状态都到了，保证UI可用
-                ['btn-move','btn-skill-0','btn-skill-1','btn-skill-2'].forEach(id => {
-                    const b = $(id); if (b) b.disabled = false;
-                });
-                const name = state.yourCharacter?.name || '?';
-                $('controlling-label').textContent = '当前操控: ' + name;
-                $('controlling-panel').classList.remove('hidden');
-            }
             if (msg.type === 'game_start') addLog('⚔️ 战斗开始！');
             break;
 
         case 'turn_result':
-            if (IS_OFFLINE && msg.for_player !== undefined) {
-                // 离线模式：存储双方视角
-                state.bothStates = state.bothStates || {};
-                state.bothStates[msg.for_player] = msg;
-                // 只取最后一方的日志
-                if (msg.for_player === 0 && msg.turn_log) {
-                    msg.turn_log.forEach(log => addLog(log));
-                }
-                // 双方都收到后，强制从人方视角开始新回合
-                if (state.bothStates[0] && state.bothStates[1]) {
-                    state.controllingPlayer = 0;
-                    updateFullState(state.bothStates[0]);
-                    state.actionConfirmed = false;
-                    state.offlineActions = {};
-                    resetActionUI();
-                    const name = state.yourCharacter?.name || '炭治郎';
-                    $('controlling-label').textContent = '当前操控: ' + name;
-                }
-            } else {
-                updateFullState(msg);
-                if (msg.turn_log) {
-                    msg.turn_log.forEach(log => addLog(log));
-                }
-                state.actionConfirmed = false;
-                state.offlineActions = {};
-                if (IS_OFFLINE) {
-                    state.controllingPlayer = 0;
-                    switchControllingPlayer();
-                }
-                resetActionUI();
-            }
+            updateFullState(msg);
+            if (msg.turn_log) msg.turn_log.forEach(log => addLog(log));
+            state.actionConfirmed = false;
+            resetActionUI();
 
-            // 检查是否有待处理的猜拳
-            if (msg.pending_rps && (!IS_OFFLINE || msg.for_player === 0)) {
-                showRPSModal(msg.rps_skill_name);
-            }
+            if (msg.pending_rps) showRPSModal(msg.rps_skill_name);
 
-            // 检查游戏结束
             if (msg.game_over) {
                 state.gameOver = true;
                 saveBattleRecord(msg);
@@ -752,36 +708,6 @@ $('btn-confirm-action').addEventListener('click', () => {
         action.direction = state.selectedDirection;
     }
 
-    if (IS_OFFLINE) {
-        // 线下模式：存储当前玩家的行动，切换到另一玩家
-        const cp = state.controllingPlayer;
-        state.offlineActions[cp] = action;
-        state.actionConfirmed = true;
-        clearActionHighlights();
-        renderMap();
-
-        // 检查双方是否都确认了
-        if (state.offlineActions[0] && state.offlineActions[1]) {
-            // 发送双方行动
-            send({
-                type: 'offline_turn',
-                actions: {
-                    '0': state.offlineActions[0],
-                    '1': state.offlineActions[1],
-                }
-            });
-            state.offlineActions = {};
-            showWaiting();
-        } else {
-            // 切换到另一方
-            switchControllingPlayer();
-            state.actionConfirmed = false;
-            addLog(`✅ ${cp === 0 ? '炭治郎' : '猗窝座'} 行动已确认，请为另一方选择`);
-        }
-        return;
-    }
-
-    // 线上模式：包装成 select_action 消息
     action.type = 'select_action';
     send(action);
 
@@ -947,55 +873,12 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
-// ========== 线下模式 ==========
-const IS_OFFLINE = urlParams.get('offline') === '1';
-state.offlineMode = IS_OFFLINE;
-state.controllingPlayer = 0;  // 当前操控哪个玩家
-state.offlineActions = {};     // {0: action, 1: action}
-
-function switchControllingPlayer() {
-    const newPid = 1 - state.controllingPlayer;
-    state.controllingPlayer = newPid;
-
-    // 用存好的对方视角更新UI
-    if (state.bothStates && state.bothStates[newPid]) {
-        updateFullState(state.bothStates[newPid]);
-    }
-
-    const name = state.yourCharacter?.name || (state.bothStates?.[newPid]?.your_character?.name || (newPid === 0 ? '炭治郎' : '猗窝座'));
-    $('controlling-label').textContent = `当前操控: ${name}`;
-    $('controlling-panel').classList.remove('hidden');
-
-    // 清除之前的选择，启用所有按钮
-    state.selectedAction = null;
-    state.selectedSkillIndex = 0;
-    state.selectedDirection = null;
-    state.highlightedCells = [];
-    state.actionConfirmed = false;
-    // 强制启用所有按钮
-    ['btn-move', 'btn-skill-0', 'btn-skill-1', 'btn-skill-2'].forEach(id => {
-        const btn = $(id);
-        if (btn) { btn.classList.remove('active'); btn.disabled = false; }
-    });
-    $('direction-picker').classList.add('hidden');
-    updateSkillButtons();
-    renderMap();
-    updateConfirmButton();
-    console.log(`切换到玩家${state.controllingPlayer}, skills=${state.yourSkills?.length}, hp=${state.yourHP}`);
-}
-
 // ========== 初始化 ==========
 console.log('⚔️ 极限格斗 PVP 鬼灭之刀 - 游戏客户端已就绪');
 $('room-display').textContent = `房间：${ROOM_CODE}`;
 
-// 显示玩家信息
 if (window.Player) {
     $('player-name-display').textContent = `🎮 ${Player.getName()}`;
-}
-
-if (IS_OFFLINE) {
-    $('controlling-panel').classList.remove('hidden');
-    // 不在这里切换，等 game_state 回来在 handleMessage 中处理
 }
 
 // ========== 战斗记录保存 ==========
