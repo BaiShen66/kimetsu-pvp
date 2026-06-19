@@ -170,6 +170,11 @@ function handleMessage(msg) {
                 msg.turn_log.forEach(log => addLog(log));
             }
             state.actionConfirmed = false;
+            state.offlineActions = {};
+            if (IS_OFFLINE) {
+                state.controllingPlayer = 0;
+                switchControllingPlayer();
+            }
             resetActionUI();
 
             // 检查是否有待处理的猜拳
@@ -700,20 +705,47 @@ $$('.dir-btn').forEach(btn => {
 $('btn-confirm-action').addEventListener('click', () => {
     if (state.actionConfirmed) return;
 
+    const action = {};
     if (state.selectedAction === 'move') {
-        send({
-            type: 'select_action',
-            action: 'move',
-            direction: state.selectedDirection,
-        });
+        action.action = 'move';
+        action.direction = state.selectedDirection;
     } else if (state.selectedAction === 'skill') {
-        send({
-            type: 'select_action',
-            action: 'skill',
-            skill_index: state.selectedSkillIndex,
-            direction: state.selectedDirection,
-        });
+        action.action = 'skill';
+        action.skill_index = state.selectedSkillIndex;
+        action.direction = state.selectedDirection;
     }
+
+    if (IS_OFFLINE) {
+        // 线下模式：存储当前玩家的行动，切换到另一玩家
+        const cp = state.controllingPlayer;
+        state.offlineActions[cp] = action;
+        state.actionConfirmed = true;
+        clearActionHighlights();
+        renderMap();
+
+        // 检查双方是否都确认了
+        if (state.offlineActions[0] && state.offlineActions[1]) {
+            // 发送双方行动
+            send({
+                type: 'offline_turn',
+                actions: {
+                    '0': state.offlineActions[0],
+                    '1': state.offlineActions[1],
+                }
+            });
+            state.offlineActions = {};
+            showWaiting();
+        } else {
+            // 切换到另一方
+            switchControllingPlayer();
+            state.actionConfirmed = false;
+            addLog(`✅ ${cp === 0 ? '炭治郎' : '猗窝座'} 行动已确认，请为另一方选择`);
+        }
+        return;
+    }
+
+    // 线上模式：直接发送
+    send(action);
 
     state.actionConfirmed = true;
     clearActionHighlights();
@@ -877,6 +909,28 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
+// ========== 线下模式 ==========
+const IS_OFFLINE = urlParams.get('offline') === '1';
+state.offlineMode = IS_OFFLINE;
+state.controllingPlayer = 0;  // 当前操控哪个玩家
+state.offlineActions = {};     // {0: action, 1: action}
+
+function switchControllingPlayer() {
+    state.controllingPlayer = 1 - state.controllingPlayer;
+    // 更新UI：显示当前操控角色
+    const name = state.controllingPlayer === 0
+        ? (state.yourCharacter?.name || '炭治郎')
+        : (state.enemyCharacter?.name || '猗窝座');
+    $('controlling-label').textContent = `当前操控: ${name}`;
+    $('controlling-panel').classList.remove('hidden');
+    // 重置按钮
+    clearActionHighlights();
+    $$('.btn-action').forEach(b => b.disabled = false);
+    updateSkillButtons();
+    renderMap();
+    updateConfirmButton();
+}
+
 // ========== 初始化 ==========
 console.log('⚔️ 极限格斗 PVP 鬼灭之刀 - 游戏客户端已就绪');
 $('room-display').textContent = `房间：${ROOM_CODE}`;
@@ -884,6 +938,11 @@ $('room-display').textContent = `房间：${ROOM_CODE}`;
 // 显示玩家信息
 if (window.Player) {
     $('player-name-display').textContent = `🎮 ${Player.getName()}`;
+}
+
+if (IS_OFFLINE) {
+    $('controlling-panel').classList.remove('hidden');
+    switchControllingPlayer();
 }
 
 // ========== 战斗记录保存 ==========

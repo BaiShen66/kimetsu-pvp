@@ -80,14 +80,8 @@
                         <span class="btn-icon">🏠</span> 创建房间
                     </button>
                     <button id="btn-single-player" class="btn btn-primary" style="background:#7b2d8b;">
-                        <span class="btn-icon">🤖</span> 单人模式
+                        <span class="btn-icon">🎮</span> 线下热座
                     </button>
-                    <div class="difficulty-select hidden" id="difficulty-select">
-                        <span style="font-size:12px;color:var(--text-dim);">AI难度：</span>
-                        <button class="btn btn-sm diff-btn active" data-diff="easy">🌱 简单</button>
-                        <button class="btn btn-sm diff-btn" data-diff="normal">⚔️ 普通</button>
-                        <button class="btn btn-sm diff-btn" data-diff="hard">💀 困难</button>
-                    </div>
                     <div class="divider">
                         <span>或</span>
                     </div>
@@ -224,6 +218,7 @@
         let roomCode = null;
         let playerId = null;
         let characterData = null;
+        let isOffline = false;
 
         // 直接取缓存名字，不再读输入框
         function getPlayerName() {
@@ -279,6 +274,7 @@
                     roomCode = msg.room_code;
                     playerId = msg.player_id;
                     characterData = msg.character;
+                    isOffline = msg.offline || false;
                     if (msg.single_player) {
                         // 单人模式：直接进入选技能
                         $('btn-create').disabled = true;
@@ -317,11 +313,13 @@
                     sessionStorage.setItem('gameState', JSON.stringify({
                         roomCode: roomCode,
                         playerId: playerId,
-                        playerName: playerName
+                        playerName: playerName,
+                        offline: isOffline || false,
                     }));
                     showPhase('redirect');
                     setTimeout(() => {
-                        window.location.href = `/game?room=${roomCode}&player=${playerId}`;
+                        const offlineParam = isOffline ? '&offline=1' : '';
+                        window.location.href = `/game?room=${roomCode}&player=${playerId}${offlineParam}`;
                     }, 800);
                     break;
 
@@ -419,35 +417,21 @@
             }
         }
 
-        // ========== 难度选择 ==========
-        let selectedDifficulty = 'normal';
+        // ========== 线下模式 ==========
         $('btn-single-player').addEventListener('click', () => {
-            const diffDiv = $('difficulty-select');
-            diffDiv.classList.toggle('hidden');
-        });
-
-        document.querySelectorAll('.diff-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                document.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                selectedDifficulty = btn.dataset.diff;
-                // 直接开始单人模式
-                playerName = getPlayerName();
-                hideError('lobby-error');
-                $('difficulty-select').classList.add('hidden');
-                connectWebSocket('lobby', 0);
-                const checkConnection = setInterval(() => {
-                    if (ws && ws.readyState === WebSocket.OPEN) {
-                        clearInterval(checkConnection);
-                        send({
-                            type: 'create_single_player',
-                            player_name: playerName,
-                            player_id: Player.getId(),
-                            difficulty: selectedDifficulty,
-                        });
-                    }
-                }, 100);
-            });
+            playerName = getPlayerName();
+            hideError('lobby-error');
+            connectWebSocket('lobby', 0);
+            const checkConnection = setInterval(() => {
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    clearInterval(checkConnection);
+                    send({
+                        type: 'create_single_player',
+                        player_name: playerName,
+                        player_id: Player.getId(),
+                    });
+                }
+            }, 100);
         });
 
         // ========== 事件绑定 ==========

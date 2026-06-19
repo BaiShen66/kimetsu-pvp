@@ -18,7 +18,6 @@ from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
 
 from game_engine import GameRoom, generate_room_code
-from ai_opponent import AIOpponent
 
 # 修复 Windows GBK 编码问题
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
@@ -71,6 +70,40 @@ async def index():
 async def game_page():
     """游戏页面"""
     return render_template("game.html")
+
+
+async def _process_and_broadcast_turn(room):
+    """处理回合并广播结果"""
+    turn_result = room.process_turn()
+
+    for pidx in [0, 1]:
+        p = room.state.players[pidx]
+        if p.ws:
+            try:
+                st = room.state.get_state_for_player(pidx)
+                st["type"] = "turn_result"
+                st["turn_log"] = turn_result["log"]
+                st["pending_rps"] = room.state.pending_rps and room.state.rps_player_id == pidx
+                if st["pending_rps"]:
+                    st["rps_skill_name"] = room.state.rps_skill_name
+                await p.ws.send_text(json.dumps(st, ensure_ascii=False))
+            except Exception:
+                pass
+
+    if room.state.game_over:
+        for pidx in [0, 1]:
+            p = room.state.players[pidx]
+            if p.ws:
+                try:
+                    await p.ws.send_text(json.dumps({
+                        "type": "game_over",
+                        "winner": room.state.winner,
+                        "winner_name": room.state.players[room.state.winner].name if room.state.winner is not None else "",
+                        "message": f"{room.state.players[room.state.winner].name} 获胜！" if room.state.winner is not None else "平局！",
+                        "battle_history": room.state.battle_history,
+                    }, ensure_ascii=False))
+                except Exception:
+                    pass
 
 
 # ====== AI 向导代理 ======
@@ -194,8 +227,7 @@ async def websocket_endpoint(ws: WebSocket, room_code: str, player_id: str):
                 }, ensure_ascii=False))
 
             elif msg_type == "create_single_player":
-                # 单人模式：创建房间 + AI自动加入
-                difficulty = message.get("difficulty", "normal")
+                # 线下热座模式：玩家操控双方
                 new_code = generate_room_code()
                 while new_code in rooms:
                     new_code = generate_room_code()
@@ -206,42 +238,19 @@ async def websocket_endpoint(ws: WebSocket, room_code: str, player_id: str):
                 room.state.players[0].name = message.get("player_name", "玩家")
                 room.state.players[0].ws = ws
                 room.state.players[0].connected = True
-                room.state.players[1].name = f"AI-{difficulty}"
+                # 玩家1也是同一个玩家
+                room.state.players[1].name = message.get("player_name", "玩家") + "(鬼方)"
+                room.state.players[1].ws = ws
                 room.state.players[1].connected = True
-                room.state.players[1].is_ai = True
                 room.host_player_id = message.get("player_id", "")
-                room.ai_difficulty = difficulty
+                room.offline_mode = True
 
-                # AI 自动选全部技能
-                try:
-                    room.state.players[1].selected_skills = list(room.state.players[1].character.skills)
-                    room.state.players[1].hp = room.state.players[1].max_hp
-                    room.state.players[1].position = (5, 11)
-                    room.ready_count = 1  # 玩家侧稍后确认
-
-                    # 初始化 AI 对手
-                    room.ai_opponent = AIOpponent(
-                        difficulty=difficulty,
-                        api_key=GUIDE_API_KEY,
-                        api_url=GUIDE_API_URL,
-                        model=GUIDE_MODEL,
-                    )
-
-                    # AI 确认技能选择
-                    result = await room.handle_message(1, {"type": "select_skills", "skill_indices": [0, 1, 2]})
-                    print(f"[单人模式] AI技能确认: {result}, ready_count={room.ready_count}")
-                except Exception as e:
-                    print(f"[单人模式] AI初始化失败: {e}")
-                    await ws.send_text(json.dumps({
-                        "type": "error", "message": f"AI初始化失败: {e}"
-                    }, ensure_ascii=False))
-                    continue
+                await ws.send_text(json.dumps({
                     "type": "room_created",
                     "room_code": new_code,
                     "player_id": 0,
                     "single_player": True,
-                    "difficulty": difficulty,
-                    "ai_name": room.state.players[1].name,
+                    "offline": True,
                     "character": {
                         "name": room.state.players[0].character.name,
                         "title": room.state.players[0].character.title,
@@ -327,6 +336,13 @@ async def websocket_endpoint(ws: WebSocket, room_code: str, player_id: str):
                 response = await room.handle_message(actual_pid, message)
                 await ws.send_text(json.dumps(response, ensure_ascii=False))
 
+                # 线下模式：自动确认鬼方技能
+                if getattr(room, 'offline_mode', False) and actual_pid == 0:
+                    try:
+                        await room.handle_message(1, {"type": "select_skills", "skill_indices": [0, 1, 2]})
+                    except Exception:
+                        pass
+
                 # 检查双方是否都准备好了
                 if room.all_ready():
                     room.state.generate_map()
@@ -340,6 +356,7 @@ async def websocket_endpoint(ws: WebSocket, room_code: str, player_id: str):
                                 st["type"] = "game_start"
                                 st["player_id"] = pidx
                                 st["player_name"] = p.name
+                                st["offline"] = getattr(room, 'offline_mode', False)
                                 await p.ws.send_text(json.dumps(st, ensure_ascii=False))
                             except Exception:
                                 pass
@@ -355,77 +372,36 @@ async def websocket_endpoint(ws: WebSocket, room_code: str, player_id: str):
                 response = await room.handle_message(actual_pid, message)
                 await ws.send_text(json.dumps(response, ensure_ascii=False))
 
-                # 如果对手是 AI，自动生成 AI 行动（玩家提交后立即生成，保证同时性）
-                other_pid = 1 - actual_pid
-                if room.state.players[other_pid].is_ai and not room.all_actions_received():
-                    try:
-                        ai_state = room.state.get_state_for_player(other_pid)
-                        ai_opponent = getattr(room, 'ai_opponent', None)
-                        if ai_opponent:
-                            ai_action = ai_opponent.decide_action(ai_state, other_pid)
-                            print(f"[AI行动] difficulty={getattr(room,'ai_difficulty','?')}, action={ai_action}")
-                            await room.handle_message(other_pid, ai_action)
-                    except Exception as e:
-                        print(f"[AI行动] 失败: {e}")
-                        # 回退：AI跳过
-                        await room.handle_message(other_pid, {"action": "move", "direction": "up"})
-
                 # 检查双方是否都提交了行动
                 if room.all_actions_received():
-                    turn_result = room.process_turn()
+                    await _process_and_broadcast_turn(room)
 
-                    # 广播回合结果
-                    for pidx in [0, 1]:
-                        p = room.state.players[pidx]
-                        if p.ws and not p.is_ai:
-                            try:
-                                st = room.state.get_state_for_player(pidx)
-                                st["type"] = "turn_result"
-                                st["turn_log"] = turn_result["log"]
-                                st["pending_rps"] = room.state.pending_rps and room.state.rps_player_id == pidx
-                                if st["pending_rps"]:
-                                    st["rps_skill_name"] = room.state.rps_skill_name
-                                await p.ws.send_text(json.dumps(st, ensure_ascii=False))
-                            except Exception:
-                                pass
+            elif msg_type == "offline_turn":
+                # 线下模式：同时提交双方行动
+                if room is None:
+                    await ws.send_text(json.dumps({"type": "error", "message": "未加入房间"}, ensure_ascii=False))
+                    continue
 
-                    # AI 的 RPS 自动处理（鬼方被猜拳时自动选择）
-                    if room.state.pending_rps and room.state.rps_player_id == 0:
-                        # 人方攻击触发猜拳，鬼方(AI)自动随机选择
-                        rps_choice = random.choice(["rock", "scissors", "paper"])
-                        rps_result = await room.handle_message(1, {"type": "rps_choice", "choice": rps_choice})
-                        # 通知人方 RPS 结果
+                actions = message.get("actions", {})
+                for pid_str, action in actions.items():
+                    pid_val = int(pid_str)
+                    await room.handle_message(pid_val, action)
+
+                if room.all_actions_received():
+                    await _process_and_broadcast_turn(room)
+                    # 线下模式 RPS：人方攻击时，弹出猜拳让玩家自己选（鬼方也由玩家操控）
+                    if room.state.pending_rps:
+                        # 给人方玩家发 RPS 请求
                         human_ws = room.state.players[0].ws
                         if human_ws:
                             try:
-                                rps_result["type"] = "rps_result"
-                                await human_ws.send_text(json.dumps(rps_result, ensure_ascii=False))
+                                st = room.state.get_state_for_player(0)
+                                st["type"] = "turn_result"
+                                st["pending_rps"] = True
+                                st["rps_skill_name"] = room.state.rps_skill_name
+                                await human_ws.send_text(json.dumps(st, ensure_ascii=False))
                             except Exception:
                                 pass
-                        if room.state.game_over:
-                            for pidx in [0, 1]:
-                                p = room.state.players[pidx]
-                                if p.ws and not p.is_ai:
-                                    try:
-                                        await p.ws.send_text(json.dumps({
-                                            "type": "game_over",
-                                            "winner": room.state.winner,
-                                            "winner_name": room.state.players[room.state.winner].name if room.state.winner is not None else "",
-                                            "message": f"{room.state.players[room.state.winner].name} 获胜！" if room.state.winner is not None else "平局！",
-                                            "battle_history": room.state.battle_history,
-                                        }, ensure_ascii=False))
-                                    except Exception:
-                                        pass
-                        else:
-                            for pidx in [0, 1]:
-                                p = room.state.players[pidx]
-                                if p.ws and not p.is_ai:
-                                    try:
-                                        st = room.state.get_state_for_player(pidx)
-                                        st["type"] = "rps_turn_end"
-                                        await p.ws.send_text(json.dumps(st, ensure_ascii=False))
-                                    except Exception:
-                                        pass
 
             elif msg_type == "rps_choice":
                 if room is None:
