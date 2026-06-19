@@ -88,6 +88,53 @@
             </div>
         </div>
 
+        <!-- 向导聊天 -->
+        <div id="guide-section" class="guide-section">
+            <div class="guide-header" id="guide-toggle">
+                <span class="guide-avatar">👺</span>
+                <span class="guide-title">鳞泷左近次 · 修炼导师</span>
+                <span class="guide-arrow">▼</span>
+            </div>
+            <div id="guide-body" class="guide-body hidden">
+                <div id="guide-messages" class="guide-messages"></div>
+                <div class="guide-input-row">
+                    <input type="text" id="guide-input" placeholder="请教导师..." maxlength="120">
+                    <button id="btn-guide-send" class="btn btn-sm btn-primary">发送</button>
+                </div>
+                <div class="guide-actions">
+                    <button id="btn-guide-settings" class="btn btn-sm">⚙️ 设置API</button>
+                    <button id="btn-guide-clear" class="btn btn-sm">清除对话</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- API 设置弹窗 -->
+        <div id="api-settings-modal" class="modal hidden">
+            <div class="modal-content" style="max-width:420px;">
+                <h3>⚙️ 向导 API 设置</h3>
+                <p style="font-size:12px;color:var(--text-dim);margin:8px 0;">
+                    需要 OpenAI 兼容 API。Key 仅存本地浏览器。
+                </p>
+                <div class="input-group">
+                    <label>API Key</label>
+                    <input type="password" id="api-key-input" placeholder="sk-...">
+                </div>
+                <div class="input-group">
+                    <label>接口地址（可选）</label>
+                    <input type="text" id="api-url-input" placeholder="https://api.openai.com/v1/chat/completions">
+                </div>
+                <div class="input-group">
+                    <label>模型名称</label>
+                    <input type="text" id="model-input" value="gpt-3.5-turbo">
+                </div>
+                <div style="display:flex;gap:8px;margin-top:12px;">
+                    <button id="btn-save-api" class="btn btn-primary" style="flex:1;">💾 保存</button>
+                    <button id="btn-cancel-api" class="btn btn-secondary" style="flex:1;">取消</button>
+                </div>
+                <p id="api-error" class="error-message hidden"></p>
+            </div>
+        </div>
+
         <!-- 阶段2: 选择技能 -->
         <div id="skill-phase" class="phase">
             <div class="title-section">
@@ -118,6 +165,8 @@
     </div>
 
     <script src="/static/player.js"></script>
+    <script src="/static/battle-records.js"></script>
+    <script src="/static/guide.js"></script>
     <script>
         // 工具函数 — 必须最先定义
         const $ = (id) => document.getElementById(id);
@@ -493,6 +542,98 @@
         // 初始加载 + 每5秒自动刷新
         refreshRoomList();
         setInterval(refreshRoomList, 5000);
+
+        // ========== 向导对话 ==========
+        // 展开/折叠
+        $('guide-toggle').addEventListener('click', () => {
+            const body = $('guide-body');
+            const arrow = document.querySelector('.guide-arrow');
+            body.classList.toggle('hidden');
+            if (arrow) arrow.textContent = body.classList.contains('hidden') ? '▼' : '▲';
+        });
+
+        // 显示问候
+        function showGuideGreeting() {
+            const msg = Guide.getGreeting();
+            addGuideMessage('guide', msg);
+        }
+
+        function addGuideMessage(role, text) {
+            const container = $('guide-messages');
+            const div = document.createElement('div');
+            div.className = role === 'guide' ? 'guide-msg guide-msg-guide' : 'guide-msg guide-msg-user';
+            div.textContent = text;
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        // 发送消息
+        async function sendGuideMessage() {
+            const input = $('guide-input');
+            const text = input.value.trim();
+            if (!text) return;
+
+            input.value = '';
+            input.disabled = true;
+            $('btn-guide-send').disabled = true;
+
+            addGuideMessage('user', text);
+
+            const reply = await Guide.chat(text);
+            addGuideMessage('guide', reply);
+
+            input.disabled = false;
+            $('btn-guide-send').disabled = false;
+            input.focus();
+        }
+
+        $('btn-guide-send').addEventListener('click', sendGuideMessage);
+        $('guide-input').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') sendGuideMessage();
+        });
+
+        // 清除对话
+        $('btn-guide-clear').addEventListener('click', () => {
+            Guide.clearHistory();
+            $('guide-messages').innerHTML = '';
+            showGuideGreeting();
+        });
+
+        // API 设置
+        $('btn-guide-settings').addEventListener('click', () => {
+            const s = Guide.getSettings();
+            $('api-key-input').value = s.apiKey || '';
+            $('api-url-input').value = s.apiUrl || '';
+            $('model-input').value = s.model || 'gpt-3.5-turbo';
+            $('api-settings-modal').classList.remove('hidden');
+        });
+
+        $('btn-cancel-api').addEventListener('click', () => {
+            $('api-settings-modal').classList.add('hidden');
+        });
+
+        $('btn-save-api').addEventListener('click', () => {
+            const key = $('api-key-input').value.trim();
+            if (!key) {
+                $('api-error').textContent = '请输入 API Key';
+                $('api-error').classList.remove('hidden');
+                return;
+            }
+            Guide.saveSettings({
+                apiKey: key,
+                apiUrl: $('api-url-input').value.trim() || 'https://api.openai.com/v1/chat/completions',
+                model: $('model-input').value.trim() || 'gpt-3.5-turbo',
+            });
+            $('api-settings-modal').classList.add('hidden');
+            $('api-error').classList.add('hidden');
+        });
+
+        $('api-settings-modal').addEventListener('click', (e) => {
+            if (e.target === $('api-settings-modal')) $('api-settings-modal').classList.add('hidden');
+        });
+
+        // 初始显示问候
+        showGuideGreeting();
 
         // ========== 初始化 ==========
         console.log('⚔️ 极限格斗 PVP 鬼灭之刀 - 大厅已就绪');
