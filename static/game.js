@@ -168,7 +168,10 @@ function handleMessage(msg) {
             state.actionConfirmed = false;
             resetActionUI();
 
-            if (msg.pending_rps) showRPSModal(msg.rps_skill_name);
+            if (msg.pending_rps) {
+                const label = msg.rps_role === 'attacker' ? '你发动攻击！选方向' : '鬼方防御！选防守';
+                showRPSModal(label);
+            }
 
             if (msg.game_over) {
                 state.gameOver = true;
@@ -178,22 +181,9 @@ function handleMessage(msg) {
             break;
 
         case 'rps_result':
-            addLog(`✊ 你出 ${getRPSName(msg.human_choice)}，鬼出 ${getRPSName(msg.demon_choice)} — ${msg.result === 'win' ? '胜利！' : msg.result === 'draw' ? '平局！再来！' : '失败'}`);
-            if (msg.damage > 0) {
-                addLog(`💥 造成 ${msg.damage} 点伤害！`);
-            }
-            if (msg.game_over) {
-                hideRPSModal();
-                state.gameOver = true;
-                showGameOver(msg);
-            } else if (msg.retry) {
-                // 平局继续猜拳，不关闭弹窗
-                state.rpsSeconds = 5;
-                $('rps-countdown').textContent = state.rpsSeconds;
-                $('rps-countdown').parentElement.classList.remove('urgent');
-            } else {
-                hideRPSModal();
-            }
+            addLog(`✊ ${getRPSName(msg.human_choice)} vs ${getRPSName(msg.demon_choice)} — ${msg.result === 'win' ? '⚔️ 砍头斩杀！' : msg.result === 'draw' ? '平局，没砍下' : '鬼防住了'}`);
+            hideRPSModal();
+            if (msg.game_over) { state.gameOver = true; showGameOver(msg); }
             break;
 
         case 'rps_turn_end':
@@ -749,16 +739,14 @@ function showWaiting() {
 }
 
 // ========== 猜拳弹窗 ==========
-function showRPSModal(skillName) {
+function showRPSModal(label) {
     state.pendingRPS = true;
     state.rpsSeconds = 5;
-
-    $('rps-skill-name').textContent = skillName ? `${skillName} 命中！猜拳决定伤害` : '技能命中，猜拳决定伤害';
+    $('rps-skill-name').textContent = label || '猜拳判定！';
     $('rps-countdown').textContent = state.rpsSeconds;
     $('rps-countdown').parentElement.classList.remove('urgent');
     $('rps-modal').classList.remove('hidden');
 
-    // 倒计时
     if (state.rpsTimer) clearInterval(state.rpsTimer);
     state.rpsTimer = setInterval(() => {
         state.rpsSeconds--;
