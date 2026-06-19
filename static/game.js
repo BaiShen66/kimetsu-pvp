@@ -169,8 +169,8 @@ function handleMessage(msg) {
             if (msg.turn_log) {
                 msg.turn_log.forEach(log => addLog(log));
             }
-            resetActionUI();
             state.actionConfirmed = false;
+            resetActionUI();
 
             // 检查是否有待处理的猜拳
             if (msg.pending_rps) {
@@ -193,6 +193,14 @@ function handleMessage(msg) {
                 state.gameOver = true;
                 showGameOver(msg);
             }
+            // 猜拳结束但游戏继续？等待 rps_turn_end 来重置 UI
+            break;
+
+        case 'rps_turn_end':
+            // 猜拳回合结束，游戏继续
+            updateFullState(msg);
+            state.actionConfirmed = false;
+            resetActionUI();
             break;
 
         case 'game_over':
@@ -726,8 +734,11 @@ function resetActionUI() {
     $('btn-confirm-action').disabled = true;
     $('btn-cancel-action').classList.add('hidden');
     $('waiting-indicator').classList.add('hidden');
-    renderMap();
+    // 重新启用所有行动按钮
+    $$('.btn-action').forEach(b => b.disabled = false);
+    updateSkillButtons();
     updateConfirmButton();
+    renderMap();
 }
 
 function showWaiting() {
