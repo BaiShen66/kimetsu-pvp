@@ -503,19 +503,7 @@ async def websocket_endpoint(ws: WebSocket, room_code: str, player_id: str):
 
                 if room.all_actions_received():
                     await _process_and_broadcast_turn(room)
-                    # 线下模式 RPS：人方攻击时，弹出猜拳让玩家自己选（鬼方也由玩家操控）
-                    if room.state.pending_rps:
-                        # 给人方玩家发 RPS 请求
-                        human_ws = room.state.players[0].ws
-                        if human_ws:
-                            try:
-                                st = room.state.get_state_for_player(0)
-                                st["type"] = "turn_result"
-                                st["pending_rps"] = True
-                                st["rps_skill_name"] = room.state.rps_skill_name
-                                await human_ws.send_text(json.dumps(st, ensure_ascii=False))
-                            except Exception:
-                                pass
+                    # pending_rps 已在 _process_and_broadcast_turn 的每条消息中发送，不重复
 
             elif msg_type == "rps_choice":
                 if room is None:
