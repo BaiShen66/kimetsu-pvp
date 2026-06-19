@@ -955,13 +955,22 @@ function switchControllingPlayer() {
     }
 
     const name = newPid === 0
-        ? (state.yourCharacter?.name || '炭治郎')
-        : (state.enemyCharacter?.name || '猗窝座');
+        ? (state.yourCharacter?.name || (state.bothStates?.[0]?.your_character?.name || '炭治郎'))
+        : (state.enemyCharacter?.name || (state.bothStates?.[1]?.your_character?.name || '猗窝座'));
     $('controlling-label').textContent = `当前操控: ${name}`;
     $('controlling-panel').classList.remove('hidden');
 
-    clearActionHighlights();
-    $$('.btn-action').forEach(b => b.disabled = false);
+    // 清除之前的选择，启用所有按钮
+    state.selectedAction = null;
+    state.selectedSkillIndex = 0;
+    state.selectedDirection = null;
+    state.highlightedCells = [];
+    state.actionConfirmed = false;
+    $$('.btn-action').forEach(b => {
+        b.classList.remove('active');
+        b.disabled = false;
+    });
+    $('direction-picker').classList.add('hidden');
     updateSkillButtons();
     renderMap();
     updateConfirmButton();

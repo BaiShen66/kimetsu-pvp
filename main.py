@@ -590,6 +590,15 @@ async def websocket_endpoint(ws: WebSocket, room_code: str, player_id: str):
                 st["for_player"] = actual_pid
                 await ws.send_text(json.dumps(st, ensure_ascii=False))
 
+                # 离线模式：同时发送另一方状态
+                if getattr(room, 'offline_mode', False):
+                    other_pid = 1 - actual_pid
+                    st2 = room.state.get_state_for_player(other_pid)
+                    st2["type"] = "game_state"
+                    st2["player_id"] = other_pid
+                    st2["for_player"] = other_pid
+                    await ws.send_text(json.dumps(st2, ensure_ascii=False))
+
             else:
                 await ws.send_text(json.dumps({
                     "type": "error",
