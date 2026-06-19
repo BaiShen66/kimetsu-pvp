@@ -182,7 +182,7 @@ async def websocket_endpoint(ws: WebSocket, room_code: str, player_id: str):
                     continue
 
                 # 确定正确的 player_id
-                actual_pid = 0 if room.state.players[0].ws == ws else 1
+                actual_pid = pid
                 response = await room.handle_message(actual_pid, message)
                 await ws.send_text(json.dumps(response, ensure_ascii=False))
 
@@ -210,7 +210,7 @@ async def websocket_endpoint(ws: WebSocket, room_code: str, player_id: str):
                     }, ensure_ascii=False))
                     continue
 
-                actual_pid = 0 if room.state.players[0].ws == ws else 1
+                actual_pid = pid
                 response = await room.handle_message(actual_pid, message)
                 await ws.send_text(json.dumps(response, ensure_ascii=False))
 
@@ -286,10 +286,7 @@ async def websocket_endpoint(ws: WebSocket, room_code: str, player_id: str):
                     }, ensure_ascii=False))
                     continue
 
-                actual_pid = 0 if room.state.players[0].ws == ws else 1
-                # 如果 ws 引用尚未关联，使用 URL 中的 pid
-                if room.state.players[0].ws != ws and room.state.players[1].ws != ws:
-                    actual_pid = pid
+                actual_pid = pid
 
                 st = room.state.get_state_for_player(actual_pid)
                 st["type"] = "game_state"
@@ -304,7 +301,7 @@ async def websocket_endpoint(ws: WebSocket, room_code: str, player_id: str):
 
     except WebSocketDisconnect:
         if room:
-            actual_pid = 0 if room.state.players[0].ws == ws else 1
+            actual_pid = pid
             room.set_player_disconnected(actual_pid)
             other_pid = 1 - actual_pid
             other_p = room.state.players[other_pid]
@@ -319,7 +316,7 @@ async def websocket_endpoint(ws: WebSocket, room_code: str, player_id: str):
     except Exception as e:
         print(f"WebSocket 错误: {e}")
         if room:
-            actual_pid = 0 if room.state.players[0].ws == ws else 1
+            actual_pid = pid
             room.set_player_disconnected(actual_pid)
 
 
