@@ -72,6 +72,23 @@ async def game_page():
     return render_template("game.html")
 
 
+def _swap_players(room, pid_a, pid_b):
+    """交换两个玩家的数据（角色、名字、ws等）"""
+    if pid_a == pid_b:
+        return
+    p = room.state.players
+    # 交换名字
+    p[pid_a].name, p[pid_b].name = p[pid_b].name, p[pid_a].name
+    # 交换ws
+    p[pid_a].ws, p[pid_b].ws = p[pid_b].ws, p[pid_a].ws
+    # 交换角色
+    p[pid_a].character, p[pid_b].character = p[pid_b].character, p[pid_a].character
+    p[pid_a].max_hp, p[pid_b].max_hp = p[pid_b].max_hp, p[pid_a].max_hp
+    p[pid_a].position, p[pid_b].position = p[pid_b].position, p[pid_a].position
+    # 交换连接状态
+    p[pid_a].connected, p[pid_b].connected = p[pid_b].connected, p[pid_a].connected
+
+
 async def _process_and_broadcast_turn(room):
     """处理回合并广播结果"""
     turn_result = room.process_turn()
@@ -315,15 +332,121 @@ async def websocket_endpoint(ws: WebSocket, room_code: str, player_id: str):
                     }
                 }, ensure_ascii=False))
 
-                # 通知房主：对手已加入
-                if room.state.players[0].ws:
-                    try:
-                        await room.state.players[0].ws.send_text(json.dumps({
-                            "type": "opponent_joined",
-                            "opponent_name": room.state.players[1].name
-                        }, ensure_ascii=False))
-                    except Exception:
-                        pass
+                # 通知房主：对手已加入 → 开始选边猜拳
+                room.side_rps_choices = {}
+                room.side_rps_winner = None
+                room.side_selected = False
+                for pidx in [0, 1]:
+                    p = room.state.players[pidx]
+                    if p.ws:
+                        try:
+                            await p.ws.send_text(json.dumps({
+                                "type": "side_rps_start",
+                                "message": "猜拳决定谁选阵营！石头剪刀布！",
+                                "opponent_name": room.state.players[1 - pidx].name,
+                            }, ensure_ascii=False))
+                        except Exception:
+                            pass
+
+            elif msg_type == "side_rps_choice":
+                # 选边猜拳
+                if room is None:
+                    await ws.send_text(json.dumps({"type": "error", "message": "未加入房间"}, ensure_ascii=False))
+                    continue
+                choice = message.get("choice", "")
+                if choice not in ("rock", "scissors", "paper"):
+                    continue
+                room.side_rps_choices[pid] = choice
+
+                if len(room.side_rps_choices) >= 2:
+                    c0 = room.side_rps_choices.get(0, "")
+                    c1 = room.side_rps_choices.get(1, "")
+                    win_map = {"rock": "scissors", "scissors": "paper", "paper": "rock"}
+
+                    if c0 == c1:
+                        # 平局重来
+                        room.side_rps_choices = {}
+                        for pidx in [0, 1]:
+                            p = room.state.players[pidx]
+                            if p.ws:
+                                try:
+                                    await p.ws.send_text(json.dumps({
+                                        "type": "side_rps_retry",
+                                        "c0": c0, "c1": c1,
+                                        "message": f"双方都出了{c0}，平局！再来！",
+                                    }, ensure_ascii=False))
+                                except Exception:
+                                    pass
+                    else:
+                        winner = 0 if win_map[c0] == c1 else 1
+                        room.side_rps_winner = winner
+                        loser = 1 - winner
+                        for pidx in [0, 1]:
+                            p = room.state.players[pidx]
+                            if p.ws:
+                                try:
+                                    await p.ws.send_text(json.dumps({
+                                        "type": "side_rps_result",
+                                        "winner": winner,
+                                        "winner_name": room.state.players[winner].name,
+                                        "c0": c0, "c1": c1,
+                                        "message": f"{room.state.players[winner].name} 猜拳获胜！请选择阵营",
+                                    }, ensure_ascii=False))
+                                except Exception:
+                                    pass
+                else:
+                    # 等待另一位玩家
+                    await ws.send_text(json.dumps({"type": "side_rps_waiting"}, ensure_ascii=False))
+
+            elif msg_type == "side_select":
+                # 胜者选择阵营
+                if room is None or room.side_rps_winner is None:
+                    await ws.send_text(json.dumps({"type": "error", "message": "无权选边"}, ensure_ascii=False))
+                    continue
+                if pid != room.side_rps_winner:
+                    await ws.send_text(json.dumps({"type": "error", "message": "不是猜拳胜者"}, ensure_ascii=False))
+                    continue
+
+                pick = message.get("pick", "human")  # "human" or "demon"
+                if pick not in ("human", "demon"):
+                    continue
+
+                winner_pid = room.side_rps_winner
+                loser_pid = 1 - winner_pid
+
+                if pick == "human":
+                    # 胜者选人方(pid=0)，需要交换角色
+                    if winner_pid != 0:
+                        _swap_players(room, winner_pid, 0)
+                else:
+                    # 胜者选鬼方(pid=1)，需要交换角色
+                    if winner_pid != 1:
+                        _swap_players(room, winner_pid, 1)
+
+                room.side_selected = True
+
+                # 通知双方开始选技能
+                for pidx in [0, 1]:
+                    p = room.state.players[pidx]
+                    if p.ws:
+                        try:
+                            await p.ws.send_text(json.dumps({
+                                "type": "side_confirmed",
+                                "your_side": "human" if pidx == 0 else "demon",
+                                "your_character": {
+                                    "name": p.character.name,
+                                    "faction": p.character.faction,
+                                    "emoji": p.character.emoji,
+                                    "skills": [
+                                        {"index": i, "name": s.name, "range_type": s.range_type,
+                                         "damage": s.damage, "effects": s.effects,
+                                         "description": s.description}
+                                        for i, s in enumerate(p.character.skills)
+                                    ]
+                                }
+                            }, ensure_ascii=False))
+                        except Exception:
+                            pass
 
             elif msg_type == "select_skills":
                 if room is None:

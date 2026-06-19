@@ -19,6 +19,31 @@
         </div>
     </div>
 
+    <!-- 选边猜拳弹窗 -->
+    <div id="side-rps-modal" class="modal hidden">
+        <div class="modal-content">
+            <h2>✊ 选边猜拳！</h2>
+            <p id="side-rps-msg">赢的人选择阵营！</p>
+            <div class="rps-buttons">
+                <button class="rps-btn side-rps-btn" data-choice="rock"><span class="rps-icon">✊</span><span>石头</span></button>
+                <button class="rps-btn side-rps-btn" data-choice="scissors"><span class="rps-icon">✌️</span><span>剪刀</span></button>
+                <button class="rps-btn side-rps-btn" data-choice="paper"><span class="rps-icon">🖐️</span><span>布</span></button>
+            </div>
+            <p id="side-rps-waiting" class="hidden waiting-text">等待对手出拳...</p>
+        </div>
+    </div>
+
+    <!-- 选阵营弹窗 -->
+    <div id="side-pick-modal" class="modal hidden">
+        <div class="modal-content">
+            <h2>🏆 你赢了！选择阵营</h2>
+            <div style="display:flex;gap:16px;justify-content:center;margin-top:16px;">
+                <button id="btn-pick-human" class="btn btn-primary" style="flex:1;padding:24px;font-size:18px;">⚔️<br>鬼杀队(人方)<br><small style="opacity:0.7;">炭治郎·猜拳攻击</small></button>
+                <button id="btn-pick-demon" class="btn btn-secondary" style="flex:1;padding:24px;font-size:18px;">👹<br>鬼方<br><small style="opacity:0.7;">猗窝座·直接伤害</small></button>
+            </div>
+        </div>
+    </div>
+
     <!-- 改名弹窗 -->
     <div id="name-modal" class="modal hidden">
         <div class="modal-content" style="max-width:360px;">
@@ -233,6 +258,51 @@
             if (target) target.classList.add('active');
         }
 
+        // ========== 选边猜拳 ==========
+        function showSideRPSModal(msg) {
+            $('side-rps-msg').textContent = msg || '赢的人选择阵营！';
+            $('side-rps-modal').classList.remove('hidden');
+            $('side-rps-waiting').classList.add('hidden');
+            $$('.side-rps-btn').forEach(b => b.disabled = false);
+        }
+        function hideSideRPSModal() {
+            $('side-rps-modal').classList.add('hidden');
+        }
+        function showSidePickModal() {
+            $('side-pick-modal').classList.remove('hidden');
+        }
+        function hideSidePickModal() {
+            $('side-pick-modal').classList.add('hidden');
+        }
+        function addSideMsg(msg) {
+            // 在大厅显示提示
+            const el = $('lobby-error');
+            if (el) {
+                el.textContent = msg;
+                el.classList.remove('hidden');
+                el.style.color = 'var(--accent-gold)';
+            }
+        }
+
+        // 猜拳按钮
+        document.querySelectorAll('.side-rps-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const choice = btn.dataset.choice;
+                btn.disabled = true;
+                $$('.side-rps-btn').forEach(b => b.disabled = true);
+                $('side-rps-waiting').classList.remove('hidden');
+                send({ type: 'side_rps_choice', choice: choice });
+            });
+        });
+
+        // 选阵营按钮
+        $('btn-pick-human').addEventListener('click', () => {
+            send({ type: 'side_select', pick: 'human' });
+        });
+        $('btn-pick-demon').addEventListener('click', () => {
+            send({ type: 'side_select', pick: 'demon' });
+        });
+
         // ========== WebSocket 连接 ==========
         function connectWebSocket(room, pid) {
             const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -299,6 +369,41 @@
 
                 case 'opponent_joined':
                     $('room-info').classList.add('hidden');
+                    // 不再直接进选技能，等选边猜拳
+                    break;
+
+                case 'side_rps_start':
+                    // 选边猜拳
+                    showSideRPSModal(msg.message);
+                    break;
+
+                case 'side_rps_retry':
+                    showSideRPSModal(msg.message);
+                    break;
+
+                case 'side_rps_waiting':
+                    // 等待对手出拳
+                    break;
+
+                case 'side_rps_result':
+                    hideSideRPSModal();
+                    if (msg.winner === playerId) {
+                        // 我赢了，选阵营
+                        showSidePickModal();
+                    } else {
+                        // 我输了，等待胜者选
+                        $('btn-create').disabled = true;
+                        $('btn-join').disabled = true;
+                        addSideMsg(`猜拳结果：${msg.message}，等待对手选择...`);
+                    }
+                    break;
+
+                case 'side_confirmed':
+                    // 阵营已确定，进入选技能
+                    hideSidePickModal();
+                    characterData = msg.your_character;
+                    $('btn-create').disabled = true;
+                    $('btn-join').disabled = true;
                     showSkillSelection();
                     break;
 
