@@ -381,9 +381,31 @@ input[type="text"]:focus {
     font-family: "Courier New", monospace;
 }
 
+/* ========== 大厅双栏布局 ========== */
+.lobby-layout {
+    display: flex;
+    gap: 20px;
+    width: 100%;
+    max-width: 1000px;
+    align-items: flex-start;
+    justify-content: center;
+}
+
+.lobby-left {
+    width: 320px;
+    flex-shrink: 0;
+    position: sticky;
+    top: 10px;
+}
+
+.lobby-right {
+    flex: 1;
+    max-width: 480px;
+    min-width: 0;
+}
+
 /* ========== AI 向导 ========== */
 .guide-section {
-    margin-top: 20px;
     background: var(--bg-card);
     border: 1px solid var(--border-color);
     border-radius: 10px;
@@ -424,7 +446,8 @@ input[type="text"]:focus {
 }
 
 .guide-messages {
-    max-height: 220px;
+    min-height: 280px;
+    max-height: 420px;
     overflow-y: auto;
     padding: 12px;
     display: flex;
@@ -481,9 +504,19 @@ input[type="text"]:focus {
     padding: 5px 10px;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 900px) {
+    .lobby-layout {
+        flex-direction: column;
+        align-items: center;
+    }
+    .lobby-left {
+        width: 100%;
+        max-width: 480px;
+        position: static;
+    }
     .guide-messages {
-        max-height: 160px;
+        min-height: 0;
+        max-height: 180px;
     }
 }
 
