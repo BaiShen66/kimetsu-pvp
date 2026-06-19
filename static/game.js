@@ -966,14 +966,16 @@ function switchControllingPlayer() {
     state.selectedDirection = null;
     state.highlightedCells = [];
     state.actionConfirmed = false;
-    $$('.btn-action').forEach(b => {
-        b.classList.remove('active');
-        b.disabled = false;
+    // 强制启用所有按钮
+    ['btn-move', 'btn-skill-0', 'btn-skill-1', 'btn-skill-2'].forEach(id => {
+        const btn = $(id);
+        if (btn) { btn.classList.remove('active'); btn.disabled = false; }
     });
     $('direction-picker').classList.add('hidden');
     updateSkillButtons();
     renderMap();
     updateConfirmButton();
+    console.log(`切换到玩家${state.controllingPlayer}, skills=${state.yourSkills?.length}, hp=${state.yourHP}`);
 }
 
 // ========== 初始化 ==========
