@@ -28,6 +28,8 @@ class Character:
     skills: List[Skill]     # 技能池
     description: str        # 角色描述
     emoji: str = "⚔️"       # 角色图标
+    passive_name: str = ""   # 被动技能名称
+    passive_desc: str = ""   # 被动技能描述
 
 
 # ========== 灶门炭治郎 技能池（6招） ==========
@@ -68,13 +70,6 @@ TANJIRO_SKILLS = [
         effects=["CAM", "AS", "ND"],
         description="4向位移斩击，不可抵消，取消敌人攻击移动"
     ),
-    Skill(
-        name="九之型·破绽之线",
-        range_type="line",
-        damage=1.0,
-        effects=["CAM"],
-        description="直线锁定弱点，取消敌人攻击移动"
-    ),
 ]
 
 
@@ -114,7 +109,9 @@ CHARACTER_TANJIRO = Character(
     max_hp=4,
     skills=TANJIRO_SKILLS,
     description="使用水之呼吸的鬼杀队少年，以灵活的剑技斩杀恶鬼。攻击鬼时需要猜拳判定。",
-    emoji="⚔️"
+    emoji="⚔️",
+    passive_name="破绽之线",
+    passive_desc="单局1次，行动后修改技能方向"
 )
 
 CHARACTER_AKAZA = Character(
