@@ -301,6 +301,36 @@ input[type="text"]:focus {
     font-size: 18px;
 }
 
+.difficulty-select {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.diff-btn {
+    flex: 1;
+    min-width: 60px;
+    padding: 8px 6px;
+    font-size: 12px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.diff-btn.active {
+    border-color: var(--accent-gold);
+    color: var(--accent-gold);
+    background: rgba(240, 192, 96, 0.1);
+}
+
+.diff-btn:hover {
+    border-color: var(--self-blue);
+}
+
 .divider {
     display: flex;
     align-items: center;

@@ -39,6 +39,7 @@ class PlayerState:
     position: Tuple[int, int] = (0, 0)
     stunned: bool = False       # 是否晕眩
     connected: bool = False
+    is_ai: bool = False          # 是否为AI玩家
     last_action: Optional[dict] = None  # 本回合的行动
     ws = None
 
@@ -592,6 +593,7 @@ class GameState:
             "winner": self.winner,
             "pending_rps": self.pending_rps and self.rps_player_id == player_id,
             "battle_history": self.battle_history if self.game_over else [],
+            "movable_cells": self.get_movable_cells(player_id),
         }
 
     def get_movable_cells_with_direction(self, player_id: int) -> dict:
